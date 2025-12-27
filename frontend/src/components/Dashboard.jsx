@@ -7,26 +7,52 @@ import API_ENDPOINTS from '../config/api';
 const Dashboard = () => {
     const [forms, setForms] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         fetchForms();
     }, []);
 
     const fetchForms = async () => {
-        
+        setLoading(true);
+        setError(null);
         try {
-            const res = await axios.get(API_ENDPOINTS.FORMS);
+            console.log('Fetching forms from:', API_ENDPOINTS.FORMS);
+            
+            // Add timeout for API call
+            const res = await axios.get(API_ENDPOINTS.FORMS, {
+                timeout: 30000, // 30 second timeout
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            // Fetch analytics for each form (with timeout and error handling)
             const formsWithCounts = await Promise.all(res.data.map(async f => {
                 try {
-                    const ana = await axios.get(API_ENDPOINTS.ANALYTICS(f._id));
-                    return { ...f, responseCount: ana.data.totalResponses };
-                } catch {
+                    const ana = await axios.get(API_ENDPOINTS.ANALYTICS(f._id), {
+                        timeout: 10000 // 10 second timeout for analytics
+                    });
+                    return { ...f, responseCount: ana.data.totalResponses || 0 };
+                } catch (err) {
+                    console.warn(`Failed to fetch analytics for form ${f._id}:`, err.message);
                     return { ...f, responseCount: 0 };
                 }
             }));
+            
             setForms(formsWithCounts);
         } catch (err) {
-            console.error(err);
+            console.error('Error fetching forms:', err);
+            const isNetworkError = !err.response;
+            const errorMessage = err.response?.data?.error || err.message || 'Failed to load forms';
+            
+            if (isNetworkError || err.code === 'ECONNABORTED') {
+                setError('Unable to connect to server. The backend might be starting up (this can take 30 seconds on free tier). Please wait a moment and refresh the page.');
+            } else if (err.response?.status === 404) {
+                setError('Backend endpoint not found. Please check your API configuration.');
+            } else {
+                setError(`Error loading forms: ${errorMessage}`);
+            }
         } finally {
             setLoading(false);
         }
@@ -45,8 +71,38 @@ const Dashboard = () => {
 
     if (loading) {
         return (
-            <div className="flex h-[80vh] items-center justify-center">
+            <div className="flex h-[80vh] items-center justify-center flex-col gap-4">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+                <p className="text-gray-500 text-sm mt-4">Loading forms...</p>
+                <p className="text-gray-400 text-xs">If this takes more than 30 seconds, the backend may be starting up</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+                <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                            </svg>
+                        </div>
+                        <div className="ml-3 flex-1">
+                            <h3 className="text-lg font-medium text-red-800">Error Loading Dashboard</h3>
+                            <p className="mt-2 text-sm text-red-700">{error}</p>
+                            <div className="mt-4">
+                                <button
+                                    onClick={fetchForms}
+                                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                                >
+                                    Retry
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
