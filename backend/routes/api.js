@@ -290,57 +290,76 @@ router.post('/ai/generate-form', async (req, res) => {
         Only return the JSON array, no other text.`;
 
         if (!process.env.CLAUDE_API_KEY) {
+            // If no Claude key, try Grok directly
+            if (process.env.GROK_API_KEY) {
+                return tryGrokAPIForForm(topic, description, numQuestions, res);
+            }
             return res.status(503).json({ error: 'Claude API Key missing in backend' });
         }
 
-        const response = await anthropic.messages.create({
-            model: 'claude-3-5-sonnet-20241022',
-            max_tokens: 4000,
-            messages: [
-                {
-                    role: 'user',
-                    content: prompt
-                }
-            ]
-        });
-
-        // Extract and parse the JSON response
-        const content = response.content[0].text;
-        let fields = [];
-        
         try {
-            // Try to extract JSON from code blocks if present
-            const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
-            fields = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
-        } catch (error) {
-            console.error('Error parsing AI response:', error);
-            return res.status(500).json({ 
-                error: 'Failed to parse AI response',
-                details: error.message,
-                rawResponse: content
+            const response = await anthropic.messages.create({
+                model: 'claude-3-5-sonnet-20241022',
+                max_tokens: 4000,
+                messages: [
+                    {
+                        role: 'user',
+                        content: prompt
+                    }
+                ]
             });
-        }
 
-        res.json({ success: true, fields });
+            // Extract and parse the JSON response
+            const content = response.content[0].text;
+            let fields = [];
+            
+            try {
+                // Try to extract JSON from code blocks if present
+                const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
+                fields = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
+            } catch (error) {
+                console.error('Error parsing AI response:', error);
+                return res.status(500).json({ 
+                    error: 'Failed to parse AI response',
+                    details: error.message,
+                    rawResponse: content
+                });
+            }
+
+            return res.json({ success: true, fields, provider: 'claude' });
+        } catch (error) {
+            console.error('Claude API generation error:', error);
+            
+            // If Claude fails due to credit issues, automatically try Grok
+            const isCreditError = error.status === 400 && (
+                error.error?.error?.message?.includes('credit balance') || 
+                error.error?.error?.message?.includes('credit') ||
+                error.message?.includes('credit')
+            );
+            
+            if (isCreditError && process.env.GROK_API_KEY) {
+                console.log("Claude credits low, automatically falling back to Grok API...");
+                return tryGrokAPIForForm(topic, description, numQuestions, res, true);
+            }
+            
+            // Handle other Claude API errors
+            if (error.status === 401) {
+                return res.status(503).json({ 
+                    error: 'Claude API authentication failed', 
+                    message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
+                });
+            }
+            
+            // If not credit error, try Grok as fallback anyway if available
+            if (process.env.GROK_API_KEY) {
+                console.log("Claude API failed, trying Grok as fallback...");
+                return tryGrokAPIForForm(topic, description, numQuestions, res, true);
+            }
+            
+            throw error; // Re-throw if no fallback available
+        }
     } catch (error) {
         console.error('AI generation error:', error);
-        
-        // Handle specific API errors
-        if (error.status === 400 && error.error?.error?.message?.includes('credit balance')) {
-            return res.status(503).json({ 
-                error: 'Claude API credits insufficient', 
-                message: 'Your Claude API account has insufficient credits. Please add credits to your Anthropic account to use AI features.',
-                details: 'Visit https://console.anthropic.com/ to manage your account and add credits.'
-            });
-        }
-        
-        if (error.status === 401) {
-            return res.status(503).json({ 
-                error: 'Claude API authentication failed', 
-                message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
-            });
-        }
-        
         res.status(500).json({ 
             error: 'Failed to generate form with AI',
             details: error.message,
