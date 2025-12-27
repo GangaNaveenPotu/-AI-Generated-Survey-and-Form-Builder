@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import API_ENDPOINTS from '../config/api';
 
 const FormRenderer = () => {
     const { id } = useParams();
@@ -14,7 +15,7 @@ const FormRenderer = () => {
     useEffect(() => {
         const fetchForm = async () => {
             try {
-                const res = await axios.get(`http://localhost:5000/api/v1/forms/${id}`);
+                const res = await axios.get(API_ENDPOINTS.FORM(id));
                 setForm(res.data);
             } catch (err) {
                 console.error(err);
@@ -68,7 +69,7 @@ const FormRenderer = () => {
         }
 
         try {
-            await axios.post(`http://localhost:5000/api/v1/forms/${id}/response`, { answers });
+            await axios.post(API_ENDPOINTS.RESPONSE(id), { answers });
             setSubmitted(true);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (err) {

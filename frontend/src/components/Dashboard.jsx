@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { BarChart3, FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import API_ENDPOINTS from '../config/api';
 
 const Dashboard = () => {
     const [forms, setForms] = useState([]);
@@ -12,11 +13,12 @@ const Dashboard = () => {
     }, []);
 
     const fetchForms = async () => {
+        
         try {
-            const res = await axios.get('http://localhost:5000/api/v1/forms');
+            const res = await axios.get(API_ENDPOINTS.FORMS);
             const formsWithCounts = await Promise.all(res.data.map(async f => {
                 try {
-                    const ana = await axios.get(`http://localhost:5000/api/v1/forms/${f._id}/analytics`);
+                    const ana = await axios.get(API_ENDPOINTS.ANALYTICS(f._id));
                     return { ...f, responseCount: ana.data.totalResponses };
                 } catch {
                     return { ...f, responseCount: 0 };
@@ -33,7 +35,7 @@ const Dashboard = () => {
     const deleteForm = async (id) => {
         if (!window.confirm('Are you sure you want to delete this form and all its responses?')) return;
         try {
-            await axios.delete(`http://localhost:5000/api/v1/forms/${id}`);
+            await axios.delete(API_ENDPOINTS.FORM(id));
             setForms(forms.filter(f => f._id !== id));
         } catch (err) {
             console.error(err);

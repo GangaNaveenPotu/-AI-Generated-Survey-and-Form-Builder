@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Download, BarChart2, PieChart, List, Users, Clock, Check, X, ChevronDown, ChevronUp } from 'lucide-react';
 import axios from 'axios';
+import API_ENDPOINTS from '../config/api';
 
 // Chart components (you'll need to install these)
 import { Bar, Pie } from 'react-chartjs-2';
@@ -23,8 +24,8 @@ const Analytics = () => {
             try {
                 setLoading(true);
                 const [formRes, responsesRes] = await Promise.all([
-                    axios.get(`http://localhost:5000/api/v1/forms/${id}`),
-                    axios.get(`http://localhost:5000/api/v1/forms/${id}/analytics`)
+                    axios.get(API_ENDPOINTS.FORM(id)),
+                    axios.get(API_ENDPOINTS.ANALYTICS(id))
                 ]);
                 
                 const form = formRes.data;

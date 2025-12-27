@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate, useParams } from 'react-router-dom';
+import API_ENDPOINTS from '../config/api';
 import { Plus, Trash, GripVertical, Wand2, Save, ArrowLeft, Type, AlignLeft, Hash, CheckSquare, CircleDot, ChevronDown, Eye, Settings2 } from 'lucide-react';
 import {
     DndContext,
@@ -157,7 +158,7 @@ const FormBuilder = () => {
     const fetchForm = async () => {
         setLoading(true);
         try {
-            const res = await axios.get(`http://localhost:5000/api/v1/forms/${id}`);
+            const res = await axios.get(API_ENDPOINTS.FORM(id));
             setTitle(res.data.title);
             setDescription(res.data.description);
             setFields(res.data.fields);
@@ -212,7 +213,7 @@ const FormBuilder = () => {
         if (!aiPrompt) return;
         setLoading(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/v1/ai/generate', { prompt: aiPrompt });
+            const res = await axios.post(API_ENDPOINTS.AI_GENERATE, { prompt: aiPrompt });
             if (res.data.fields) {
                 // Ensure all fields have IDs (fallback if AI doesn't provide them)
                 const fieldsWithIds = res.data.fields.map((field, index) => ({
@@ -248,9 +249,9 @@ const FormBuilder = () => {
             const formData = { title, description, fields };
             let res;
             if (isEditing) {
-                res = await axios.put(`http://localhost:5000/api/v1/forms/${id}`, formData);
+                res = await axios.put(API_ENDPOINTS.FORM(id), formData);
             } else {
-                res = await axios.post('http://localhost:5000/api/v1/forms', formData);
+                res = await axios.post(API_ENDPOINTS.FORMS, formData);
             }
             navigate(`/form/${res.data._id}`);
         } catch (err) {
