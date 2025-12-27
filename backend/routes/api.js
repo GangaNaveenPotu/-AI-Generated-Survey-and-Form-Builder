@@ -557,9 +557,11 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
 router.post('/ai/generate-grok', async (req, res) => {
     const { prompt } = req.body;
     if (!process.env.GROK_API_KEY) {
+        console.error("GROK_API_KEY is not set in environment variables");
         return res.status(503).json({ 
-            error: 'Grok API Key missing in backend',
-            message: 'Please set GROK_API_KEY in your .env file for testing.'
+            error: 'Grok API Key missing',
+            message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
+            details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
         });
     }
 

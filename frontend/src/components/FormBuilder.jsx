@@ -247,7 +247,11 @@ const FormBuilder = () => {
             const providerName = aiProvider === 'grok' ? 'Grok' : 'Claude';
             
             if (err.response?.status === 503) {
-                alert(`${providerName} API Error: ${errorMessage}\n\n${details || `Please check your ${providerName} API configuration or create the form manually.`}`);
+                if (aiProvider === 'grok' && errorMessage.includes('Grok API Key missing')) {
+                    alert(`⚠️ Grok API Key Not Configured\n\n${errorMessage}\n\nPlease add GROK_API_KEY to your Render environment variables, or switch back to Claude API.`);
+                } else {
+                    alert(`${providerName} API Error: ${errorMessage}\n\n${details || `Please check your ${providerName} API configuration or create the form manually.`}`);
+                }
             } else {
                 alert(`${providerName} API Error: ${errorMessage}\n\n${details || 'Ensure backend is running and try again.'}`);
             }
