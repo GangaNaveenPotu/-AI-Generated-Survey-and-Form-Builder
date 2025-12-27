@@ -105,10 +105,14 @@ router.get('/forms/:id/analytics', async (req, res) => {
 
 // --- AI ROUTES ---
 
-// Generate form fields using Claude (default)
+// Generate form fields using Claude (default) with automatic Grok fallback
 router.post('/ai/generate', async (req, res) => {
     const { prompt } = req.body;
     if (!process.env.CLAUDE_API_KEY) {
+        // If no Claude key, try Grok directly
+        if (process.env.GROK_API_KEY) {
+            return tryGrokAPI(prompt, res);
+        }
         return res.status(503).json({ error: 'Claude API Key missing in backend' });
     }
 
@@ -134,24 +138,34 @@ router.post('/ai/generate', async (req, res) => {
         const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '');
         const fields = JSON.parse(jsonBlock);
 
-        res.json({ fields });
+        res.json({ fields, provider: 'claude' });
     } catch (err) {
-        console.error("AI Error:", err);
+        console.error("Claude API Error:", err);
         
-        // Handle specific API errors
-        if (err.status === 400 && err.error?.error?.message?.includes('credit balance')) {
-            return res.status(503).json({ 
-                error: 'Claude API credits insufficient', 
-                message: 'Your Claude API account has insufficient credits. Please add credits to your Anthropic account to use AI features.',
-                details: 'Visit https://console.anthropic.com/ to manage your account and add credits.'
-            });
+        // If Claude fails due to credit issues, automatically try Grok
+        const isCreditError = err.status === 400 && (
+            err.error?.error?.message?.includes('credit balance') || 
+            err.error?.error?.message?.includes('credit') ||
+            err.message?.includes('credit')
+        );
+        
+        if (isCreditError && process.env.GROK_API_KEY) {
+            console.log("Claude credits low, automatically falling back to Grok API...");
+            return tryGrokAPI(prompt, res, true); // true = isFallback
         }
         
+        // Handle other Claude API errors
         if (err.status === 401) {
             return res.status(503).json({ 
                 error: 'Claude API authentication failed', 
                 message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
             });
+        }
+        
+        // If not credit error, try Grok as fallback anyway if available
+        if (process.env.GROK_API_KEY) {
+            console.log("Claude API failed, trying Grok as fallback...");
+            return tryGrokAPI(prompt, res, true);
         }
         
         res.status(500).json({ 
@@ -161,6 +175,86 @@ router.post('/ai/generate', async (req, res) => {
         });
     }
 });
+
+// Helper function to call Grok API
+async function tryGrokAPI(prompt, res, isFallback = false) {
+    if (!process.env.GROK_API_KEY) {
+        return res.status(503).json({ 
+            error: 'Grok API Key missing',
+            message: 'Grok API key is not configured. Please set GROK_API_KEY in your .env file.'
+        });
+    }
+
+    try {
+        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'grok-beta',
+                messages: [{
+                    role: 'user',
+                    content: `Generate a list of form fields for a form about: "${prompt}". 
+                    Return ONLY a JSON array of objects. Each object should have:
+                    - id: string (unique)
+                    - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
+                    - label: string
+                    - placeholder: string (optional)
+                    - options: array of strings (only for radio/checkbox/select)
+                    - required: boolean
+                    Do not include any markdown formatting or explanation.`
+                }],
+                max_tokens: 1024,
+                temperature: 0.7
+            })
+        });
+
+        if (!grokResponse.ok) {
+            const errorData = await grokResponse.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
+        }
+
+        const data = await grokResponse.json();
+        const textResponse = data.choices[0]?.message?.content || '';
+        
+        // Parse the JSON from the content
+        const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
+        const fields = JSON.parse(jsonBlock);
+
+        return res.json({ 
+            fields, 
+            provider: 'grok',
+            fallback: isFallback,
+            message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+        });
+    } catch (err) {
+        console.error("Grok API Error:", err);
+        
+        if (isFallback) {
+            // If Grok also fails during fallback, return error
+            return res.status(500).json({ 
+                error: 'Both Claude and Grok API failed', 
+                details: err.message,
+                message: 'Failed to generate form with both AI providers. Please try again or create the form manually.'
+            });
+        }
+        
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+            return res.status(503).json({ 
+                error: 'Grok API authentication failed', 
+                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
+            });
+        }
+        
+        return res.status(500).json({ 
+            error: 'Failed to generate form with Grok', 
+            details: err.message,
+            message: 'An error occurred while generating the form with Grok API. Please try again.'
+        });
+    }
+}
 
 // AI-Generated Form Suggestion
 router.post('/ai/generate-form', async (req, res) => {

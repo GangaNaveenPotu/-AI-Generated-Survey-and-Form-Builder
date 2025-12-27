@@ -231,6 +231,14 @@ const FormBuilder = () => {
                 setFields([...fields, ...fieldsWithIds]);
                 setAiPrompt('');
                 setActiveTab('build'); // Switch back to see result
+                
+                // Show message if Grok was used as fallback
+                if (res.data.fallback && res.data.provider === 'grok') {
+                    alert('✅ Form generated successfully!\n\nℹ️ Note: Claude API credits were low, so Grok API was used instead.');
+                } else if (res.data.provider === 'grok' && aiProvider === 'claude') {
+                    // If user selected Claude but got Grok (automatic fallback)
+                    alert('✅ Form generated successfully!\n\nℹ️ Note: Claude API credits were low, so Grok API was automatically used instead.');
+                }
             }
         } catch (err) {
             console.error(err);
