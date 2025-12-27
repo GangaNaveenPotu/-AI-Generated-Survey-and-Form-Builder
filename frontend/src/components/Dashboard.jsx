@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { BarChart3, FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2 } from 'lucide-react';
+import { BarChart3, FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2, Share2 } from 'lucide-react';
 import API_ENDPOINTS from '../config/api';
+import ShareModal from './ShareModal';
 
 const Dashboard = () => {
     const [forms, setForms] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [shareModalOpen, setShareModalOpen] = useState(false);
+    const [selectedForm, setSelectedForm] = useState(null);
 
     useEffect(() => {
         fetchForms();
@@ -91,6 +94,16 @@ Please verify the backend URL in Vercel environment variables.`);
             console.error(err);
             alert('Failed to delete form');
         }
+    };
+
+    const openShareModal = (form) => {
+        setSelectedForm(form);
+        setShareModalOpen(true);
+    };
+
+    const closeShareModal = () => {
+        setShareModalOpen(false);
+        setSelectedForm(null);
     };
 
     if (loading) {
@@ -190,6 +203,13 @@ Please verify the backend URL in Vercel environment variables.`);
                                     <BarChart3 size={18} />
                                 </Link>
                                 <button
+                                    onClick={() => openShareModal(form)}
+                                    className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                    title="Share Form"
+                                >
+                                    <Share2 size={18} />
+                                </button>
+                                <button
                                     onClick={() => deleteForm(form._id)}
                                     className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                     title="Delete Form"
@@ -225,6 +245,16 @@ Please verify the backend URL in Vercel environment variables.`);
                     </div>
                 )}
             </div>
+
+            {/* Share Modal */}
+            {selectedForm && (
+                <ShareModal
+                    isOpen={shareModalOpen}
+                    onClose={closeShareModal}
+                    formTitle={selectedForm.title}
+                    formId={selectedForm._id}
+                />
+            )}
         </div>
     );
 };
