@@ -277,7 +277,14 @@ MERN_ROLE/
    ```
    VITE_API_URL=https://ai-generated-survey-and-form-builder.onrender.com
    ```
-6. Click **"Create Static Site"**
+6. **⚠️ IMPORTANT - Configure SPA Routing:**
+   - After creating the site, go to **Settings** → **Redirects/Rewrites**
+   - Add a new rewrite rule:
+     - **Source**: `/*`
+     - **Destination**: `/index.html`
+     - **Action**: `Rewrite` (not Redirect)
+   - This ensures shared form links work correctly
+7. Click **"Create Static Site"**
 
 **⚠️ Security Warning:** Use environment variables in your hosting platform. Never commit real credentials to the repository.
 
@@ -360,6 +367,18 @@ VITE_API_URL=http://localhost:5000
 **Build Errors:**
 - Clear `node_modules` and reinstall: `rm -rf node_modules && npm install`
 - Check Node.js version (v16+ required)
+
+**"Page Not Found" When Opening Shared Form Links:**
+- This is a common SPA routing issue on Render
+- **Solution**: Configure redirects/rewrites in Render dashboard:
+  1. Go to your static site in Render dashboard
+  2. Navigate to **Settings** → **Redirects/Rewrites**
+  3. Add rewrite rule:
+     - **Source**: `/*`
+     - **Destination**: `/index.html`
+     - **Action**: `Rewrite` (not Redirect)
+  4. Save and redeploy
+- This ensures all routes are handled by React Router
 
 ---
 
