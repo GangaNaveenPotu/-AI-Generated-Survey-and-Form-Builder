@@ -3,6 +3,19 @@
 // In development, it defaults to localhost
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+// Log the API URL for debugging (only in development or if URL seems wrong)
+if (typeof window !== 'undefined') {
+    const expectedProductionURL = 'https://ai-generated-survey-and-form-builder.onrender.com';
+    if (API_BASE_URL !== 'http://localhost:5000' && API_BASE_URL !== expectedProductionURL) {
+        console.warn('⚠️ API URL mismatch detected!');
+        console.warn('Current API URL:', API_BASE_URL);
+        console.warn('Expected URL:', expectedProductionURL);
+        console.warn('Please check Vercel environment variable VITE_API_URL');
+    } else {
+        console.log('✅ API URL configured:', API_BASE_URL);
+    }
+}
+
 export const API_ENDPOINTS = {
   BASE: API_BASE_URL,
   FORMS: `${API_BASE_URL}/api/v1/forms`,
