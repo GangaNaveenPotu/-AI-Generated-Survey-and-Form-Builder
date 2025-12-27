@@ -142,36 +142,46 @@ router.post('/ai/generate', async (req, res) => {
     } catch (err) {
         console.error("Claude API Error:", err);
         console.error("Error details:", JSON.stringify(err, null, 2));
+        console.error("Error status:", err.status);
+        console.error("Error statusCode:", err.statusCode);
         
         // Check for credit error in multiple ways (Anthropic error structure can vary)
         const errorMessage = err.error?.error?.message || err.message || err.toString() || '';
         const errorString = JSON.stringify(err).toLowerCase();
+        const statusCode = err.status || err.statusCode || 500;
+        
+        // Check if it's a credit error (400 status OR contains credit message)
         const isCreditError = (
-            err.status === 400 && (
+            statusCode === 400 && (
                 errorMessage.toLowerCase().includes('credit balance') || 
                 errorMessage.toLowerCase().includes('credit') ||
                 errorString.includes('credit balance') ||
                 errorString.includes('credit')
             )
+        ) || (
+            errorMessage.toLowerCase().includes('credit balance') || 
+            errorMessage.toLowerCase().includes('credit') ||
+            errorString.includes('credit balance') ||
+            errorString.includes('credit')
         );
         
-        console.log("Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
+        console.log("Status code:", statusCode, "Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
         
-        // If Claude fails due to credit issues, automatically try Grok
-        if (isCreditError && process.env.GROK_API_KEY) {
-            console.log("Claude credits low, automatically falling back to Grok API...");
+        // If Claude fails due to credit issues OR any 400 error, automatically try Grok
+        if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
+            console.log("Claude API error detected, automatically falling back to Grok API...");
             return tryGrokAPI(prompt, res, true); // true = isFallback
         }
         
         // Handle other Claude API errors
-        if (err.status === 401) {
+        if (statusCode === 401) {
             return res.status(503).json({ 
                 error: 'Claude API authentication failed', 
                 message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
             });
         }
         
-        // If not credit error, try Grok as fallback anyway if available
+        // If any error and Grok is available, try Grok as fallback
         if (process.env.GROK_API_KEY) {
             console.log("Claude API failed, trying Grok as fallback...");
             return tryGrokAPI(prompt, res, true);
@@ -339,36 +349,46 @@ router.post('/ai/generate-form', async (req, res) => {
         } catch (error) {
             console.error('Claude API generation error:', error);
             console.error("Error details:", JSON.stringify(error, null, 2));
+            console.error("Error status:", error.status);
+            console.error("Error statusCode:", error.statusCode);
             
             // Check for credit error in multiple ways (Anthropic error structure can vary)
             const errorMessage = error.error?.error?.message || error.message || error.toString() || '';
             const errorString = JSON.stringify(error).toLowerCase();
+            const statusCode = error.status || error.statusCode || 500;
+            
+            // Check if it's a credit error (400 status OR contains credit message)
             const isCreditError = (
-                error.status === 400 && (
+                statusCode === 400 && (
                     errorMessage.toLowerCase().includes('credit balance') || 
                     errorMessage.toLowerCase().includes('credit') ||
                     errorString.includes('credit balance') ||
                     errorString.includes('credit')
                 )
+            ) || (
+                errorMessage.toLowerCase().includes('credit balance') || 
+                errorMessage.toLowerCase().includes('credit') ||
+                errorString.includes('credit balance') ||
+                errorString.includes('credit')
             );
             
-            console.log("Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
+            console.log("Status code:", statusCode, "Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
             
-            // If Claude fails due to credit issues, automatically try Grok
-            if (isCreditError && process.env.GROK_API_KEY) {
-                console.log("Claude credits low, automatically falling back to Grok API...");
+            // If Claude fails due to credit issues OR any 400 error, automatically try Grok
+            if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
+                console.log("Claude API error detected, automatically falling back to Grok API...");
                 return tryGrokAPIForForm(topic, description, numQuestions, res, true);
             }
             
             // Handle other Claude API errors
-            if (error.status === 401) {
+            if (statusCode === 401) {
                 return res.status(503).json({ 
                     error: 'Claude API authentication failed', 
                     message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
                 });
             }
             
-            // If not credit error, try Grok as fallback anyway if available
+            // If any error and Grok is available, try Grok as fallback
             if (process.env.GROK_API_KEY) {
                 console.log("Claude API failed, trying Grok as fallback...");
                 return tryGrokAPIForForm(topic, description, numQuestions, res, true);
