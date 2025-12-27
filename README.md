@@ -85,10 +85,12 @@ cd MERN_ROLE
 3. Create a `.env` file in the backend directory:
    ```env
    PORT=5000
-   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ai-generated-form?retryWrites=true&w=majority
+   MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form?retryWrites=true&w=majority
    CLAUDE_API_KEY=your_claude_api_key_here
    NODE_ENV=development
    ```
+   
+   **⚠️ Security Note:** Never commit your `.env` file or expose real credentials. Replace `YOUR_USERNAME`, `YOUR_PASSWORD`, and `YOUR_CLUSTER` with your actual MongoDB Atlas credentials.
 
 4. Start the backend server:
    ```bash
@@ -250,11 +252,13 @@ VITE_API_URL=https://ai-generated-survey-and-form-builder.onrender.com
 
 **Backend (Render):**
 ```
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ai-generated-form
+MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form
 CLAUDE_API_KEY=your_claude_api_key
 NODE_ENV=production
 PORT=10000
 ```
+
+**⚠️ Security Warning:** Use environment variables in your hosting platform. Never commit real credentials to the repository.
 
 ---
 
@@ -264,11 +268,13 @@ PORT=10000
 
 ```env
 PORT=5000
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/ai-generated-form?retryWrites=true&w=majority
+MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form?retryWrites=true&w=majority
 CLAUDE_API_KEY=your_claude_api_key_here
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 ```
+
+**⚠️ Important:** Replace all placeholder values with your actual credentials. Never commit this file to version control.
 
 ### Frontend (.env)
 
