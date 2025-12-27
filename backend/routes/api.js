@@ -366,7 +366,113 @@ router.post('/ai/generate-form', async (req, res) => {
             message: 'An error occurred while generating the form. Please try again or create the form manually.'
         });
     }
-});
+}
+
+// Helper function to call Grok API for generate-form endpoint
+async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallback = false) {
+    if (!process.env.GROK_API_KEY) {
+        return res.status(503).json({ 
+            error: 'Grok API Key missing',
+            message: 'Grok API key is not configured. Please set GROK_API_KEY in your .env file.'
+        });
+    }
+
+    try {
+        const prompt = `You are an expert form designer. Create a form with ${numQuestions} questions about "${topic}"${description ? ` with the following details: ${description}` : ''}.
+        
+        For each field, provide:
+        1. A unique ID (use camelCase)
+        2. Field type (text, textarea, number, radio, checkbox, select)
+        3. A clear and concise label
+        4. Placeholder text (if applicable)
+        5. Options (for radio, checkbox, select)
+        6. Whether the field is required
+        
+        Format the response as a JSON array of objects with these properties:
+        [
+            {
+                "id": "fieldName",
+                "type": "fieldType",
+                "label": "Field Label",
+                "placeholder": "Example placeholder",
+                "options": ["Option 1", "Option 2"],
+                "required": true
+            }
+        ]
+        
+        Only return the JSON array, no other text.`;
+
+        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'grok-beta',
+                messages: [{
+                    role: 'user',
+                    content: prompt
+                }],
+                max_tokens: 4000,
+                temperature: 0.7
+            })
+        });
+
+        if (!grokResponse.ok) {
+            const errorData = await grokResponse.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
+        }
+
+        const data = await grokResponse.json();
+        const content = data.choices[0]?.message?.content || '';
+        let fields = [];
+        
+        try {
+            // Try to extract JSON from code blocks if present
+            const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
+            fields = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
+        } catch (error) {
+            console.error('Error parsing Grok response:', error);
+            return res.status(500).json({ 
+                error: 'Failed to parse Grok AI response',
+                details: error.message,
+                rawResponse: content
+            });
+        }
+
+        return res.json({ 
+            success: true, 
+            fields, 
+            provider: 'grok',
+            fallback: isFallback,
+            message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+        });
+    } catch (err) {
+        console.error("Grok API Error:", err);
+        
+        if (isFallback) {
+            return res.status(500).json({ 
+                error: 'Both Claude and Grok API failed', 
+                details: err.message,
+                message: 'Failed to generate form with both AI providers. Please try again or create the form manually.'
+            });
+        }
+        
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+            return res.status(503).json({ 
+                error: 'Grok API authentication failed', 
+                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
+            });
+        }
+        
+        return res.status(500).json({ 
+            error: 'Failed to generate form with Grok', 
+            details: err.message,
+            message: 'An error occurred while generating the form with Grok API. Please try again.'
+        });
+    }
+}
 
 // Generate form fields using Grok API (testing - separate endpoint)
 router.post('/ai/generate-grok', async (req, res) => {
