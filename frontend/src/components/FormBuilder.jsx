@@ -422,7 +422,7 @@ Expected URL: https://ai-generated-survey-and-form-builder.onrender.com`);
                                     
                                     {/* AI Provider Toggle */}
                                     <div className="mb-4">
-                                        <label className="text-xs font-semibold text-purple-800 mb-2 block">AI Provider (Testing)</label>
+                                        <label className="text-xs font-semibold text-purple-800 mb-2 block">AI Provider</label>
                                         <div className="flex gap-2 bg-white p-1 rounded-lg border border-purple-200">
                                             <button
                                                 onClick={() => setAiProvider('claude')}
@@ -436,15 +436,21 @@ Expected URL: https://ai-generated-survey-and-form-builder.onrender.com`);
                                             </button>
                                             <button
                                                 onClick={() => setAiProvider('grok')}
-                                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all relative ${
                                                     aiProvider === 'grok' 
                                                         ? 'bg-blue-600 text-white shadow-sm' 
                                                         : 'text-gray-600 hover:bg-gray-50'
                                                 }`}
+                                                title="Grok API requires GROK_API_KEY to be set in Render environment variables"
                                             >
                                                 Grok (Testing)
                                             </button>
                                         </div>
+                                        {aiProvider === 'grok' && (
+                                            <p className="text-xs text-amber-600 mt-2 bg-amber-50 p-2 rounded border border-amber-200">
+                                                ⚠️ Note: Grok API requires GROK_API_KEY to be configured in Render environment variables.
+                                            </p>
+                                        )}
                                     </div>
                                     
                                     <p className="text-sm text-purple-700 mb-4 leading-relaxed">
