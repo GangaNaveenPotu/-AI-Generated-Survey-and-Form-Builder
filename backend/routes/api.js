@@ -795,6 +795,48 @@ router.post('/ai/generate-grok', async (req, res) => {
     }
 });
 
+// Test Grok API connection
+router.get('/ai/test-grok', async (req, res) => {
+    try {
+        if (!process.env.GROK_API_KEY) {
+            return res.status(503).json({ 
+                error: 'Grok API Key missing',
+                message: 'GROK_API_KEY is not configured.'
+            });
+        }
+
+        // Try a simple API call to test the connection
+        const testResponse = await fetch('https://api.x.ai/v1/models', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+            }
+        });
+
+        if (!testResponse.ok) {
+            const errorData = await testResponse.json().catch(() => ({}));
+            return res.status(testResponse.status).json({
+                error: 'Grok API test failed',
+                status: testResponse.status,
+                details: errorData
+            });
+        }
+
+        const models = await testResponse.json();
+        return res.json({
+            success: true,
+            message: 'Grok API connection successful',
+            availableModels: models.data?.map(m => m.id) || []
+        });
+    } catch (err) {
+        console.error("Grok API test error:", err);
+        return res.status(500).json({
+            error: 'Grok API test failed',
+            details: err.message
+        });
+    }
+});
+
 // --- ANALYTICS ROUTES ---
 
 module.exports = router;
