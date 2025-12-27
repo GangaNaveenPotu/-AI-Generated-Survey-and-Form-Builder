@@ -10,6 +10,7 @@ const FormRenderer = () => {
     const [answers, setAnswers] = useState({});
     const [submitted, setSubmitted] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState(null);
 
     useEffect(() => {
@@ -68,13 +69,29 @@ const FormRenderer = () => {
             return;
         }
 
+        setSubmitting(true);
         try {
-            await axios.post(API_ENDPOINTS.RESPONSE(id), { answers });
-            setSubmitted(true);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            const response = await axios.post(API_ENDPOINTS.RESPONSE(id), { answers });
+            if (response.status === 201) {
+                setSubmitted(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         } catch (err) {
-            console.error(err);
-            alert('Submission failed. Please try again.');
+            console.error('Submission error:', err);
+            const errorMessage = err.response?.data?.error || err.message || 'Submission failed';
+            const isNetworkError = !err.response;
+            
+            if (isNetworkError) {
+                alert('Network error: Unable to connect to server. Please check your internet connection and try again.');
+            } else if (err.response?.status === 404) {
+                alert('Form not found. The form may have been deleted.');
+            } else if (err.response?.status === 500) {
+                alert('Server error: ' + errorMessage + '\n\nPlease try again later.');
+            } else {
+                alert('Submission failed: ' + errorMessage + '\n\nPlease try again.');
+            }
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -231,9 +248,17 @@ const FormRenderer = () => {
                         <div className="pt-6">
                             <button
                                 type="submit"
-                                className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0"
+                                disabled={submitting}
+                                className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
-                                Submit Response
+                                {submitting ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                        Submitting...
+                                    </>
+                                ) : (
+                                    'Submit Response'
+                                )}
                             </button>
                         </div>
                     </form>
