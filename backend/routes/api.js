@@ -141,14 +141,23 @@ router.post('/ai/generate', async (req, res) => {
         res.json({ fields, provider: 'claude' });
     } catch (err) {
         console.error("Claude API Error:", err);
+        console.error("Error details:", JSON.stringify(err, null, 2));
         
-        // If Claude fails due to credit issues, automatically try Grok
-        const isCreditError = err.status === 400 && (
-            err.error?.error?.message?.includes('credit balance') || 
-            err.error?.error?.message?.includes('credit') ||
-            err.message?.includes('credit')
+        // Check for credit error in multiple ways (Anthropic error structure can vary)
+        const errorMessage = err.error?.error?.message || err.message || err.toString() || '';
+        const errorString = JSON.stringify(err).toLowerCase();
+        const isCreditError = (
+            err.status === 400 && (
+                errorMessage.toLowerCase().includes('credit balance') || 
+                errorMessage.toLowerCase().includes('credit') ||
+                errorString.includes('credit balance') ||
+                errorString.includes('credit')
+            )
         );
         
+        console.log("Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
+        
+        // If Claude fails due to credit issues, automatically try Grok
         if (isCreditError && process.env.GROK_API_KEY) {
             console.log("Claude credits low, automatically falling back to Grok API...");
             return tryGrokAPI(prompt, res, true); // true = isFallback
@@ -329,14 +338,23 @@ router.post('/ai/generate-form', async (req, res) => {
             return res.json({ success: true, fields, provider: 'claude' });
         } catch (error) {
             console.error('Claude API generation error:', error);
+            console.error("Error details:", JSON.stringify(error, null, 2));
             
-            // If Claude fails due to credit issues, automatically try Grok
-            const isCreditError = error.status === 400 && (
-                error.error?.error?.message?.includes('credit balance') || 
-                error.error?.error?.message?.includes('credit') ||
-                error.message?.includes('credit')
+            // Check for credit error in multiple ways (Anthropic error structure can vary)
+            const errorMessage = error.error?.error?.message || error.message || error.toString() || '';
+            const errorString = JSON.stringify(error).toLowerCase();
+            const isCreditError = (
+                error.status === 400 && (
+                    errorMessage.toLowerCase().includes('credit balance') || 
+                    errorMessage.toLowerCase().includes('credit') ||
+                    errorString.includes('credit balance') ||
+                    errorString.includes('credit')
+                )
             );
             
+            console.log("Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
+            
+            // If Claude fails due to credit issues, automatically try Grok
             if (isCreditError && process.env.GROK_API_KEY) {
                 console.log("Claude credits low, automatically falling back to Grok API...");
                 return tryGrokAPIForForm(topic, description, numQuestions, res, true);
@@ -366,7 +384,7 @@ router.post('/ai/generate-form', async (req, res) => {
             message: 'An error occurred while generating the form. Please try again or create the form manually.'
         });
     }
-}
+});
 
 // Helper function to call Grok API for generate-form endpoint
 async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallback = false) {
