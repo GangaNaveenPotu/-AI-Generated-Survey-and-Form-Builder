@@ -247,8 +247,9 @@ const FormBuilder = () => {
             const providerName = aiProvider === 'grok' ? 'Grok' : 'Claude';
             
             if (err.response?.status === 503) {
-                if (aiProvider === 'grok' && errorMessage.includes('Grok API Key missing')) {
-                    alert(`⚠️ Grok API Key Not Configured\n\n${errorMessage}\n\nPlease add GROK_API_KEY to your Render environment variables, or switch back to Claude API.`);
+                if (aiProvider === 'grok' && (errorMessage.includes('Grok API Key') || errorMessage.includes('GROK_API_KEY'))) {
+                    const detailsMsg = err.response?.data?.details || '';
+                    alert(`⚠️ Grok API Key Not Configured\n\n${errorMessage}\n\n${detailsMsg}\n\nTo fix this:\n1. Go to Render Dashboard\n2. Select your backend service\n3. Go to Environment tab\n4. Add GROK_API_KEY with your Grok API key\n5. Redeploy\n\nOr switch back to Claude (Default) for now.`);
                 } else {
                     alert(`${providerName} API Error: ${errorMessage}\n\n${details || `Please check your ${providerName} API configuration or create the form manually.`}`);
                 }
