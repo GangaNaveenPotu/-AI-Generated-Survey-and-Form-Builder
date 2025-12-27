@@ -143,6 +143,7 @@ const FormBuilder = () => {
     const [description, setDescription] = useState('');
     const [fields, setFields] = useState([]);
     const [aiPrompt, setAiPrompt] = useState('');
+    const [aiProvider, setAiProvider] = useState('claude'); // 'claude' or 'grok' - default is claude
     const [loading, setLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('build'); // 'build' or 'ai'
     const navigate = useNavigate();
@@ -213,7 +214,14 @@ const FormBuilder = () => {
         if (!aiPrompt) return;
         setLoading(true);
         try {
-            const res = await axios.post(API_ENDPOINTS.AI_GENERATE, { prompt: aiPrompt });
+            // Use Claude by default, Grok if selected
+            const endpoint = aiProvider === 'grok' ? API_ENDPOINTS.AI_GENERATE_GROK : API_ENDPOINTS.AI_GENERATE;
+            const res = await axios.post(endpoint, { prompt: aiPrompt }, {
+                timeout: 30000,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
             if (res.data.fields) {
                 // Ensure all fields have IDs (fallback if AI doesn't provide them)
                 const fieldsWithIds = res.data.fields.map((field, index) => ({
@@ -228,11 +236,12 @@ const FormBuilder = () => {
             console.error(err);
             const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to generate form';
             const details = err.response?.data?.details || '';
+            const providerName = aiProvider === 'grok' ? 'Grok' : 'Claude';
             
             if (err.response?.status === 503) {
-                alert(`${errorMessage}\n\n${details || 'Please check your Claude API configuration or create the form manually.'}`);
+                alert(`${providerName} API Error: ${errorMessage}\n\n${details || `Please check your ${providerName} API configuration or create the form manually.`}`);
             } else {
-                alert(`${errorMessage}\n\n${details || 'Ensure backend is running and try again.'}`);
+                alert(`${providerName} API Error: ${errorMessage}\n\n${details || 'Ensure backend is running and try again.'}`);
             }
         } finally {
             setLoading(false);
@@ -398,8 +407,36 @@ Expected URL: https://ai-generated-survey-and-form-builder.onrender.com`);
                                     <h3 className="font-bold text-purple-900 mb-2 flex items-center gap-2">
                                         <Wand2 size={18} className="text-purple-600" /> AI Generator
                                     </h3>
+                                    
+                                    {/* AI Provider Toggle */}
+                                    <div className="mb-4">
+                                        <label className="text-xs font-semibold text-purple-800 mb-2 block">AI Provider (Testing)</label>
+                                        <div className="flex gap-2 bg-white p-1 rounded-lg border border-purple-200">
+                                            <button
+                                                onClick={() => setAiProvider('claude')}
+                                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                                                    aiProvider === 'claude' 
+                                                        ? 'bg-purple-600 text-white shadow-sm' 
+                                                        : 'text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                Claude (Default)
+                                            </button>
+                                            <button
+                                                onClick={() => setAiProvider('grok')}
+                                                className={`flex-1 py-2 px-3 rounded-md text-sm font-medium transition-all ${
+                                                    aiProvider === 'grok' 
+                                                        ? 'bg-blue-600 text-white shadow-sm' 
+                                                        : 'text-gray-600 hover:bg-gray-50'
+                                                }`}
+                                            >
+                                                Grok (Testing)
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
                                     <p className="text-sm text-purple-700 mb-4 leading-relaxed">
-                                        Describe what you need, and Claude will generate the entire form structure for you instantly.
+                                        Describe what you need, and {aiProvider === 'grok' ? 'Grok' : 'Claude'} will generate the entire form structure for you instantly.
                                     </p>
 
                                     <textarea

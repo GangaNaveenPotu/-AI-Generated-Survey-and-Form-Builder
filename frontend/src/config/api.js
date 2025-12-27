@@ -26,6 +26,7 @@ export const API_ENDPOINTS = {
   RESPONSE: (id) => `${API_BASE_URL}/api/v1/forms/${id}/response`,
   ANALYTICS: (id) => `${API_BASE_URL}/api/v1/forms/${id}/analytics`,
   AI_GENERATE: `${API_BASE_URL}/api/v1/ai/generate`,
+  AI_GENERATE_GROK: `${API_BASE_URL}/api/v1/ai/generate-grok`, // Testing - Grok API
   AI_GENERATE_FORM: `${API_BASE_URL}/api/v1/ai/generate-form`,
 };
 

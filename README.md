@@ -87,10 +87,13 @@ cd MERN_ROLE
    PORT=5000
    MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form?retryWrites=true&w=majority
    CLAUDE_API_KEY=your_claude_api_key_here
+   GROK_API_KEY=your_grok_api_key_here
    NODE_ENV=development
    ```
    
    **⚠️ Security Note:** Never commit your `.env` file or expose real credentials. Replace `YOUR_USERNAME`, `YOUR_PASSWORD`, and `YOUR_CLUSTER` with your actual MongoDB Atlas credentials.
+   
+   **📝 Note:** `GROK_API_KEY` is optional and only for testing. Claude API is the default. You can remove Grok API support later if needed.
 
 4. Start the backend server:
    ```bash

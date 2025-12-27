@@ -105,7 +105,7 @@ router.get('/forms/:id/analytics', async (req, res) => {
 
 // --- AI ROUTES ---
 
-// Generate form fields using Claude
+// Generate form fields using Claude (default)
 router.post('/ai/generate', async (req, res) => {
     const { prompt } = req.body;
     if (!process.env.CLAUDE_API_KEY) {
@@ -251,6 +251,81 @@ router.post('/ai/generate-form', async (req, res) => {
             error: 'Failed to generate form with AI',
             details: error.message,
             message: 'An error occurred while generating the form. Please try again or create the form manually.'
+        });
+    }
+});
+
+// Generate form fields using Grok API (testing - separate endpoint)
+router.post('/ai/generate-grok', async (req, res) => {
+    const { prompt } = req.body;
+    if (!process.env.GROK_API_KEY) {
+        return res.status(503).json({ 
+            error: 'Grok API Key missing in backend',
+            message: 'Please set GROK_API_KEY in your .env file for testing.'
+        });
+    }
+
+    try {
+        // Grok API uses OpenAI-compatible endpoint
+        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'grok-beta',
+                messages: [{
+                    role: 'user',
+                    content: `Generate a list of form fields for a form about: "${prompt}". 
+                    Return ONLY a JSON array of objects. Each object should have:
+                    - id: string (unique)
+                    - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
+                    - label: string
+                    - placeholder: string (optional)
+                    - options: array of strings (only for radio/checkbox/select)
+                    - required: boolean
+                    Do not include any markdown formatting or explanation.`
+                }],
+                max_tokens: 1024,
+                temperature: 0.7
+            })
+        });
+
+        if (!grokResponse.ok) {
+            const errorData = await grokResponse.json().catch(() => ({}));
+            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
+        }
+
+        const data = await grokResponse.json();
+        const textResponse = data.choices[0]?.message?.content || '';
+        
+        // Parse the JSON from the content
+        const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
+        const fields = JSON.parse(jsonBlock);
+
+        res.json({ fields, provider: 'grok' });
+    } catch (err) {
+        console.error("Grok API Error:", err);
+        
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+            return res.status(503).json({ 
+                error: 'Grok API authentication failed', 
+                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
+            });
+        }
+        
+        if (err.message?.includes('429') || err.message?.includes('rate limit')) {
+            return res.status(503).json({ 
+                error: 'Grok API rate limit exceeded', 
+                message: 'Too many requests. Please try again later.'
+            });
+        }
+        
+        res.status(500).json({ 
+            error: 'Failed to generate form with Grok', 
+            details: err.message,
+            message: 'An error occurred while generating the form with Grok API. Please try again or use Claude API.'
         });
     }
 });
