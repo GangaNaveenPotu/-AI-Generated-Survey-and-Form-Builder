@@ -256,7 +256,7 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
                 'Authorization': `Bearer ${process.env.GROK_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'grok-beta',
+                model: 'grok-2-1212',
                 messages: [{
                     role: 'user',
                     content: `Generate a list of form fields for a form about: "${prompt}". 
@@ -276,11 +276,18 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
 
         if (!grokResponse.ok) {
             const errorData = await grokResponse.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
+            console.error("Grok API Error Response:", JSON.stringify(errorData, null, 2));
+            const errorMsg = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+            throw new Error(errorMsg);
         }
 
         const data = await grokResponse.json();
         const textResponse = data.choices[0]?.message?.content || '';
+        
+        if (!textResponse) {
+            console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
+            throw new Error('Grok API returned empty response');
+        }
         
         // Parse the JSON from the content
         const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
@@ -498,7 +505,7 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
                 'Authorization': `Bearer ${process.env.GROK_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'grok-beta',
+                model: 'grok-2-1212',
                 messages: [{
                     role: 'user',
                     content: prompt
@@ -584,7 +591,7 @@ router.post('/ai/generate-grok', async (req, res) => {
                 'Authorization': `Bearer ${process.env.GROK_API_KEY}`
             },
             body: JSON.stringify({
-                model: 'grok-beta',
+                model: 'grok-2-1212',
                 messages: [{
                     role: 'user',
                     content: `Generate a list of form fields for a form about: "${prompt}". 
@@ -604,11 +611,18 @@ router.post('/ai/generate-grok', async (req, res) => {
 
         if (!grokResponse.ok) {
             const errorData = await grokResponse.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
+            console.error("Grok API Error Response:", JSON.stringify(errorData, null, 2));
+            const errorMsg = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+            throw new Error(errorMsg);
         }
 
         const data = await grokResponse.json();
         const textResponse = data.choices[0]?.message?.content || '';
+        
+        if (!textResponse) {
+            console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
+            throw new Error('Grok API returned empty response');
+        }
         
         // Parse the JSON from the content
         const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
