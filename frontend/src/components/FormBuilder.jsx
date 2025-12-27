@@ -244,19 +244,56 @@ const FormBuilder = () => {
             alert('Please add at least one field to your form.');
             return;
         }
+        
+        if (!title || title.trim() === '') {
+            alert('Please enter a form title.');
+            return;
+        }
+        
         setLoading(true);
         try {
             const formData = { title, description, fields };
+            
+            // Log for debugging
+            console.log('Saving form to:', isEditing ? API_ENDPOINTS.FORM(id) : API_ENDPOINTS.FORMS);
+            console.log('Form data:', { title, description, fieldsCount: fields.length });
+            
             let res;
             if (isEditing) {
-                res = await axios.put(API_ENDPOINTS.FORM(id), formData);
+                res = await axios.put(API_ENDPOINTS.FORM(id), formData, {
+                    timeout: 30000, // 30 second timeout
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
             } else {
-                res = await axios.post(API_ENDPOINTS.FORMS, formData);
+                res = await axios.post(API_ENDPOINTS.FORMS, formData, {
+                    timeout: 30000, // 30 second timeout
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
             }
-            navigate(`/form/${res.data._id}`);
+            
+            if (res.data && res.data._id) {
+                navigate(`/form/${res.data._id}`);
+            } else {
+                throw new Error('Invalid response from server');
+            }
         } catch (err) {
-            console.error(err);
-            alert('Failed to save form');
+            console.error('Save form error:', err);
+            const errorMessage = err.response?.data?.error || err.message || 'Failed to save form';
+            const isNetworkError = !err.response;
+            
+            if (isNetworkError) {
+                alert('Network error: Unable to connect to server.\n\nThis might be because:\n- Backend server is starting (wait 30 seconds and try again)\n- Check your internet connection\n- Backend URL might be incorrect');
+            } else if (err.response?.status === 404) {
+                alert('Form not found. Please refresh and try again.');
+            } else if (err.response?.status === 500) {
+                alert('Server error: ' + errorMessage + '\n\nPlease try again later or check backend logs.');
+            } else {
+                alert('Failed to save form: ' + errorMessage + '\n\nPlease check:\n- Backend is running\n- All required fields are filled\n- Try again in a few moments');
+            }
         } finally {
             setLoading(false);
         }
