@@ -107,109 +107,124 @@ router.get('/forms/:id/analytics', async (req, res) => {
 
 // Generate form fields using Claude (default) with automatic Grok fallback
 router.post('/ai/generate', async (req, res) => {
-    const { prompt } = req.body;
-    if (!process.env.CLAUDE_API_KEY) {
-        // If no Claude key, try Grok directly
-        if (process.env.GROK_API_KEY) {
-            return tryGrokAPI(prompt, res);
-        }
-        return res.status(503).json({ error: 'Claude API Key missing in backend' });
-    }
-
     try {
-        const msg = await anthropic.messages.create({
-            model: "claude-3-5-sonnet-20241022",
-            max_tokens: 1024,
-            messages: [{
-                role: "user", content: `Generate a list of form fields for a form about: "${prompt}". 
-            Return ONLY a JSON array of objects. Each object should have:
-            - id: string (unique)
-            - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
-            - label: string
-            - placeholder: string (optional)
-            - options: array of strings (only for radio/checkbox/select)
-            - required: boolean
-            Do not include any markdown formatting or explanation.` }]
-        });
-
-        // Parse the JSON from the content
-        const textResponse = msg.content[0].text;
-        // Attempt to clean if specific markdown is present
-        const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '');
-        const fields = JSON.parse(jsonBlock);
-
-        res.json({ fields, provider: 'claude' });
-    } catch (err) {
-        console.error("Claude API Error:", err);
+        const { prompt } = req.body;
         
-        // Safely stringify error (might fail on circular references)
-        let errorString = '';
-        let errorMessage = '';
-        try {
-            errorString = JSON.stringify(err).toLowerCase();
-            errorMessage = err.error?.error?.message || err.message || err.toString() || '';
-        } catch (e) {
-            errorMessage = err.message || err.toString() || String(err);
-            errorString = errorMessage.toLowerCase();
+        if (!prompt) {
+            return res.status(400).json({ error: 'Prompt is required' });
         }
         
-        const statusCode = err.status || err.statusCode || 500;
-        
-        console.error("Error status:", statusCode);
-        console.error("Error message:", errorMessage);
-        console.error("Grok API Key available:", !!process.env.GROK_API_KEY);
-        
-        // Check if it's a credit error (400 status OR contains credit message)
-        const isCreditError = (
-            statusCode === 400 && (
+        if (!process.env.CLAUDE_API_KEY) {
+            // If no Claude key, try Grok directly
+            if (process.env.GROK_API_KEY) {
+                return await tryGrokAPI(prompt, res);
+            }
+            return res.status(503).json({ error: 'Claude API Key missing in backend' });
+        }
+
+        try {
+            const msg = await anthropic.messages.create({
+                model: "claude-3-5-sonnet-20241022",
+                max_tokens: 1024,
+                messages: [{
+                    role: "user", content: `Generate a list of form fields for a form about: "${prompt}". 
+                Return ONLY a JSON array of objects. Each object should have:
+                - id: string (unique)
+                - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
+                - label: string
+                - placeholder: string (optional)
+                - options: array of strings (only for radio/checkbox/select)
+                - required: boolean
+                Do not include any markdown formatting or explanation.` }]
+            });
+
+            // Parse the JSON from the content
+            const textResponse = msg.content[0].text;
+            // Attempt to clean if specific markdown is present
+            const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '');
+            const fields = JSON.parse(jsonBlock);
+
+            return res.json({ fields, provider: 'claude' });
+        } catch (err) {
+            console.error("Claude API Error:", err);
+            
+            // Safely stringify error (might fail on circular references)
+            let errorString = '';
+            let errorMessage = '';
+            try {
+                errorString = JSON.stringify(err).toLowerCase();
+                errorMessage = err.error?.error?.message || err.message || err.toString() || '';
+            } catch (e) {
+                errorMessage = err.message || err.toString() || String(err);
+                errorString = errorMessage.toLowerCase();
+            }
+            
+            const statusCode = err.status || err.statusCode || 500;
+            
+            console.error("Error status:", statusCode);
+            console.error("Error message:", errorMessage);
+            console.error("Grok API Key available:", !!process.env.GROK_API_KEY);
+            
+            // Check if it's a credit error (400 status OR contains credit message)
+            const isCreditError = (
+                statusCode === 400 && (
+                    errorMessage.toLowerCase().includes('credit balance') || 
+                    errorMessage.toLowerCase().includes('credit') ||
+                    errorString.includes('credit balance') ||
+                    errorString.includes('credit')
+                )
+            ) || (
                 errorMessage.toLowerCase().includes('credit balance') || 
                 errorMessage.toLowerCase().includes('credit') ||
                 errorString.includes('credit balance') ||
                 errorString.includes('credit')
-            )
-        ) || (
-            errorMessage.toLowerCase().includes('credit balance') || 
-            errorMessage.toLowerCase().includes('credit') ||
-            errorString.includes('credit balance') ||
-            errorString.includes('credit')
-        );
-        
-        console.log("Is credit error?", isCreditError);
-        
-        // If Claude fails due to credit issues OR any 400 error, automatically try Grok
-        if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
-            console.log("Claude API error detected, automatically falling back to Grok API...");
-            try {
-                return await tryGrokAPI(prompt, res, true); // true = isFallback
-            } catch (grokErr) {
-                console.error("Grok fallback also failed:", grokErr);
-                // Continue to error response below
+            );
+            
+            console.log("Is credit error?", isCreditError);
+            
+            // If Claude fails due to credit issues OR any 400 error, automatically try Grok
+            if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
+                console.log("Claude API error detected, automatically falling back to Grok API...");
+                try {
+                    return await tryGrokAPI(prompt, res, true); // true = isFallback
+                } catch (grokErr) {
+                    console.error("Grok fallback also failed:", grokErr);
+                    // Continue to error response below
+                }
             }
-        }
-        
-        // Handle other Claude API errors
-        if (statusCode === 401) {
-            return res.status(503).json({ 
-                error: 'Claude API authentication failed', 
-                message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
+            
+            // Handle other Claude API errors
+            if (statusCode === 401) {
+                return res.status(503).json({ 
+                    error: 'Claude API authentication failed', 
+                    message: 'Invalid or missing Claude API key. Please check your CLAUDE_API_KEY in the .env file.'
+                });
+            }
+            
+            // If any error and Grok is available, try Grok as fallback
+            if (process.env.GROK_API_KEY) {
+                console.log("Claude API failed, trying Grok as fallback...");
+                try {
+                    return await tryGrokAPI(prompt, res, true);
+                } catch (grokErr) {
+                    console.error("Grok fallback also failed:", grokErr);
+                    // Continue to error response below
+                }
+            }
+            
+            res.status(500).json({ 
+                error: 'Failed to generate form', 
+                details: errorMessage,
+                message: 'An error occurred while generating the form. Please try again or create the form manually.'
             });
         }
-        
-        // If any error and Grok is available, try Grok as fallback
-        if (process.env.GROK_API_KEY) {
-            console.log("Claude API failed, trying Grok as fallback...");
-            try {
-                return await tryGrokAPI(prompt, res, true);
-            } catch (grokErr) {
-                console.error("Grok fallback also failed:", grokErr);
-                // Continue to error response below
-            }
-        }
-        
+    } catch (outerErr) {
+        // Catch any unhandled errors
+        console.error("Unhandled error in /ai/generate:", outerErr);
         res.status(500).json({ 
-            error: 'Failed to generate form', 
-            details: errorMessage,
-            message: 'An error occurred while generating the form. Please try again or create the form manually.'
+            error: 'Internal server error', 
+            details: outerErr.message,
+            message: 'An unexpected error occurred. Please try again or create the form manually.'
         });
     }
 });
