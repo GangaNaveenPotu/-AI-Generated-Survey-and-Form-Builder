@@ -661,17 +661,26 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
 
 // Generate form fields using Grok API (testing - separate endpoint)
 router.post('/ai/generate-grok', async (req, res) => {
-    const { prompt } = req.body;
-    if (!process.env.GROK_API_KEY) {
-        console.error("GROK_API_KEY is not set in environment variables");
-        return res.status(503).json({ 
-            error: 'Grok API Key missing',
-            message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
-            details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
-        });
-    }
-
     try {
+        const { prompt } = req.body;
+        
+        if (!prompt) {
+            return res.status(400).json({ 
+                error: 'Missing prompt',
+                message: 'Please provide a prompt for form generation.'
+            });
+        }
+        
+        if (!process.env.GROK_API_KEY) {
+            console.error("GROK_API_KEY is not set in environment variables");
+            return res.status(503).json({ 
+                error: 'Grok API Key missing',
+                message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
+                details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
+            });
+        }
+
+        try {
         // Try different model names in order
         const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
         let lastError = null;
@@ -751,7 +760,8 @@ router.post('/ai/generate-grok', async (req, res) => {
         throw new Error(lastError || 'All Grok models failed');
     } catch (err) {
         console.error("Grok API Error:", err);
-        
+        console.error("Error stack:", err.stack);
+            
         if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
             return res.status(503).json({ 
                 error: 'Grok API authentication failed', 
@@ -766,10 +776,21 @@ router.post('/ai/generate-grok', async (req, res) => {
             });
         }
         
-        res.status(500).json({ 
+        return res.status(500).json({ 
             error: 'Failed to generate form with Grok', 
             details: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
             message: 'An error occurred while generating the form with Grok API. Please try again or use Claude API.'
+        });
+    }
+    } catch (outerErr) {
+        console.error("Unexpected error in /ai/generate-grok endpoint:", outerErr);
+        console.error("Error stack:", outerErr.stack);
+        return res.status(500).json({ 
+            error: 'Unexpected server error', 
+            details: outerErr.message,
+            stack: process.env.NODE_ENV === 'development' ? outerErr.stack : undefined,
+            message: 'An unexpected error occurred. Please check server logs for details.'
         });
     }
 });
