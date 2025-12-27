@@ -259,7 +259,14 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
         
         // Parse the JSON from the content
         const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
-        const fields = JSON.parse(jsonBlock);
+        let fields;
+        try {
+            fields = JSON.parse(jsonBlock);
+        } catch (parseErr) {
+            console.error("Failed to parse Grok response as JSON:", parseErr);
+            console.error("Raw response:", textResponse);
+            throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
+        }
 
         return res.json({ 
             fields, 
@@ -578,7 +585,14 @@ router.post('/ai/generate-grok', async (req, res) => {
         
         // Parse the JSON from the content
         const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
-        const fields = JSON.parse(jsonBlock);
+        let fields;
+        try {
+            fields = JSON.parse(jsonBlock);
+        } catch (parseErr) {
+            console.error("Failed to parse Grok response as JSON:", parseErr);
+            console.error("Raw response:", textResponse);
+            throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
+        }
 
         res.json({ fields, provider: 'grok' });
     } catch (err) {
