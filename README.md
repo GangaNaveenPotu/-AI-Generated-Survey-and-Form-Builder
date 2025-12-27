@@ -6,12 +6,12 @@ A full-stack MERN application that allows users to create, manage, and analyze s
 
 **🎉 Application is live and ready to use!**
 
-- **Frontend (Vercel)**: [https://ai-generated-survey-and-form-builde.vercel.app/](https://ai-generated-survey-and-form-builde.vercel.app/)
+- **Frontend (Render)**: [https://ai-form-builder-frontend.onrender.com](https://ai-form-builder-frontend.onrender.com)
 - **Backend API (Render)**: [https://ai-generated-survey-and-form-builder.onrender.com](https://ai-generated-survey-and-form-builder.onrender.com)
 
 ### Try It Now!
 
-1. Visit the [live frontend](https://ai-generated-survey-and-form-builde.vercel.app/)
+1. Visit the [live frontend](https://ai-form-builder-frontend.onrender.com)
 2. Create a new form
 3. Add fields using drag-and-drop
 4. Submit test responses
@@ -198,11 +198,8 @@ MERN_ROLE/
 │   │   ├── main.jsx         # Entry point
 │   │   └── index.css       # Global styles
 │   ├── package.json        # Frontend dependencies
-│   ├── vercel.json         # Vercel deployment config
 │   └── vite.config.js      # Vite configuration
 │
-├── DEMO.md                  # Demo script
-├── EXAMPLE.md               # Example usage guide
 └── README.md               # This file
 ```
 
@@ -234,29 +231,53 @@ MERN_ROLE/
 
 ### Current Deployment
 
-- **Frontend**: Deployed on [Vercel](https://vercel.com)
-- **Backend**: Deployed on [Render](https://render.com)
+- **Frontend**: Deployed on [Render](https://render.com) as Static Site
+- **Backend**: Deployed on [Render](https://render.com) as Web Service
 - **Database**: MongoDB Atlas (free tier)
 
 ### Deployment URLs
 
-- Frontend: https://ai-generated-survey-and-form-builde.vercel.app/
+- Frontend: https://ai-form-builder-frontend.onrender.com
 - Backend: https://ai-generated-survey-and-form-builder.onrender.com
 
-### Environment Variables for Deployment
+### Deploying to Render
 
-**Frontend (Vercel):**
-```
-VITE_API_URL=https://ai-generated-survey-and-form-builder.onrender.com
-```
+#### Backend Deployment (Web Service)
 
-**Backend (Render):**
-```
-MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form
-CLAUDE_API_KEY=your_claude_api_key
-NODE_ENV=production
-PORT=10000
-```
+1. Go to [Render Dashboard](https://render.com)
+2. Click **"New +"** → **"Web Service"**
+3. Connect your GitHub repository
+4. Configure:
+   - **Name**: `ai-generated-survey-and-form-builder`
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Environment**: `Node`
+5. Add Environment Variables:
+   ```
+   MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form
+   CLAUDE_API_KEY=your_claude_api_key
+   NODE_ENV=production
+   PORT=10000
+   ```
+6. Click **"Create Web Service"**
+
+#### Frontend Deployment (Static Site)
+
+1. Go to [Render Dashboard](https://render.com)
+2. Click **"New +"** → **"Static Site"**
+3. Connect your GitHub repository
+4. Configure:
+   - **Name**: `ai-form-builder-frontend`
+   - **Branch**: `main`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Publish Directory**: `dist`
+5. Add Environment Variable:
+   ```
+   VITE_API_URL=https://ai-generated-survey-and-form-builder.onrender.com
+   ```
+6. Click **"Create Static Site"**
 
 **⚠️ Security Warning:** Use environment variables in your hosting platform. Never commit real credentials to the repository.
 
@@ -342,11 +363,6 @@ VITE_API_URL=http://localhost:5000
 
 ---
 
-## 📚 Additional Resources
-
-- [DEMO.md](./DEMO.md) - Demo script for showcasing the application
-- [EXAMPLE.md](./EXAMPLE.md) - Example usage guide
-
 ---
 
 ## 🤝 Contributing
@@ -371,7 +387,7 @@ This project is licensed under the MIT License.
 - [MongoDB](https://www.mongodb.com/) for the database
 - [React](https://reactjs.org/) and [Express](https://expressjs.com/) for the web frameworks
 - [Chart.js](https://www.chartjs.org/) for data visualization
-- [Vercel](https://vercel.com/) and [Render](https://render.com/) for hosting
+- [Render](https://render.com/) for hosting
 
 ---
 
