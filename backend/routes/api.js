@@ -185,12 +185,11 @@ router.post('/ai/generate', async (req, res) => {
             // If Claude fails due to credit issues OR any 400 error, automatically try Grok
             if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
                 console.log("Claude API error detected, automatically falling back to Grok API...");
-                try {
-                    return await tryGrokAPI(prompt, res, true); // true = isFallback
-                } catch (grokErr) {
+                const grokResult = await tryGrokAPI(prompt, res, true).catch(grokErr => {
                     console.error("Grok fallback also failed:", grokErr);
-                    // Continue to error response below
-                }
+                    return null; // Return null to indicate failure
+                });
+                if (grokResult) return; // If Grok succeeded, response was already sent
             }
             
             // Handle other Claude API errors
@@ -204,12 +203,18 @@ router.post('/ai/generate', async (req, res) => {
             // If any error and Grok is available, try Grok as fallback
             if (process.env.GROK_API_KEY) {
                 console.log("Claude API failed, trying Grok as fallback...");
-                try {
-                    return await tryGrokAPI(prompt, res, true);
-                } catch (grokErr) {
+                const grokResult = await tryGrokAPI(prompt, res, true).catch(grokErr => {
                     console.error("Grok fallback also failed:", grokErr);
-                    // Continue to error response below
-                }
+                    return null; // Return null to indicate failure
+                });
+                if (grokResult) return; // If Grok succeeded, response was already sent
+            } else if (isCreditError || statusCode === 400) {
+                // If Claude credits are low but Grok is not configured, show helpful message
+                return res.status(503).json({ 
+                    error: 'Claude API credits insufficient and Grok fallback unavailable', 
+                    message: 'Your Claude API credits are low. To enable automatic fallback to Grok API, please set GROK_API_KEY in your Render environment variables.',
+                    details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
+                });
             }
             
             res.status(500).json({ 
@@ -232,9 +237,14 @@ router.post('/ai/generate', async (req, res) => {
 // Helper function to call Grok API
 async function tryGrokAPI(prompt, res, isFallback = false) {
     if (!process.env.GROK_API_KEY) {
+        console.error("Grok API Key not found in environment variables");
+        const errorMsg = isFallback 
+            ? 'Grok API key is not configured. Claude API failed and Grok fallback is unavailable. Please set GROK_API_KEY in Render environment variables.'
+            : 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.';
         return res.status(503).json({ 
             error: 'Grok API Key missing',
-            message: 'Grok API key is not configured. Please set GROK_API_KEY in your .env file.'
+            message: errorMsg,
+            details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
         });
     }
 
