@@ -44,12 +44,36 @@ const Dashboard = () => {
         } catch (err) {
             console.error('Error fetching forms:', err);
             const isNetworkError = !err.response;
+            const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
             const errorMessage = err.response?.data?.error || err.message || 'Failed to load forms';
             
-            if (isNetworkError || err.code === 'ECONNABORTED') {
-                setError('Unable to connect to server. The backend might be starting up (this can take 30 seconds on free tier). Please wait a moment and refresh the page.');
+            if (isTimeout) {
+                setError(`Request timed out after 30 seconds. This usually means:
+                
+• The backend server is starting up (Render free tier takes ~30 seconds to wake up)
+• The backend URL might be incorrect
+• Network connectivity issues
+
+Current API URL: ${API_ENDPOINTS.BASE}
+
+Please wait 30-60 seconds and click Retry, or check your Vercel environment variables.`);
+            } else if (isNetworkError) {
+                setError(`Unable to connect to backend server.
+
+Current API URL: ${API_ENDPOINTS.BASE}
+
+Possible issues:
+• Backend is not running or URL is incorrect
+• CORS configuration issue
+• Network connectivity problem
+
+Please verify VITE_API_URL in Vercel settings is set to: https://ai-generated-survey-and-form-builder.onrender.com`);
             } else if (err.response?.status === 404) {
-                setError('Backend endpoint not found. Please check your API configuration.');
+                setError(`Backend endpoint not found.
+
+Current API URL: ${API_ENDPOINTS.BASE}
+
+Please verify the backend URL in Vercel environment variables.`);
             } else {
                 setError(`Error loading forms: ${errorMessage}`);
             }

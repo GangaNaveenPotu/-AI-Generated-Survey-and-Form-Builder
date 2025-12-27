@@ -284,9 +284,27 @@ const FormBuilder = () => {
             console.error('Save form error:', err);
             const errorMessage = err.response?.data?.error || err.message || 'Failed to save form';
             const isNetworkError = !err.response;
+            const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
             
-            if (isNetworkError) {
-                alert('Network error: Unable to connect to server.\n\nThis might be because:\n- Backend server is starting (wait 30 seconds and try again)\n- Check your internet connection\n- Backend URL might be incorrect');
+            if (isTimeout) {
+                alert(`Request timed out after 30 seconds.
+
+This usually means the backend is starting up (Render free tier takes ~30 seconds).
+
+Current API URL: ${API_ENDPOINTS.BASE}
+
+Please wait 30-60 seconds and try again. If the issue persists, check your Vercel environment variables.`);
+            } else if (isNetworkError) {
+                alert(`Network error: Unable to connect to server.
+
+Current API URL: ${API_ENDPOINTS.BASE}
+
+Possible issues:
+• Backend server is starting (wait 30 seconds)
+• Backend URL is incorrect
+• Check Vercel environment variable VITE_API_URL
+
+Expected URL: https://ai-generated-survey-and-form-builder.onrender.com`);
             } else if (err.response?.status === 404) {
                 alert('Form not found. Please refresh and try again.');
             } else if (err.response?.status === 500) {
