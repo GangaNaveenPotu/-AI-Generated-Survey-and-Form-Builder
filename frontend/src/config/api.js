@@ -1,9 +1,12 @@
 // API Configuration
 // In production, this will be set by environment variables
 // In development, it defaults to localhost
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+let API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// Log the API URL for debugging (only in development or if URL seems wrong)
+// Remove trailing slash to prevent double slashes in URLs
+API_BASE_URL = API_BASE_URL.replace(/\/+$/, '');
+
+// Log the API URL for debugging
 if (typeof window !== 'undefined') {
     const expectedProductionURL = 'https://ai-generated-survey-and-form-builder.onrender.com';
     if (API_BASE_URL !== 'http://localhost:5000' && API_BASE_URL !== expectedProductionURL) {
