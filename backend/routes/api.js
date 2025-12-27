@@ -249,30 +249,88 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
     }
 
     try {
-        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'grok-2-1212',
-                messages: [{
-                    role: 'user',
-                    content: `Generate a list of form fields for a form about: "${prompt}". 
-                    Return ONLY a JSON array of objects. Each object should have:
-                    - id: string (unique)
-                    - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
-                    - label: string
-                    - placeholder: string (optional)
-                    - options: array of strings (only for radio/checkbox/select)
-                    - required: boolean
-                    Do not include any markdown formatting or explanation.`
-                }],
-                max_tokens: 1024,
-                temperature: 0.7
-            })
-        });
+        // Try different model names in order
+        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
+        let lastError = null;
+        
+        for (const model of models) {
+            try {
+                console.log(`Trying Grok model: ${model}`);
+                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{
+                            role: 'user',
+                            content: `Generate a list of form fields for a form about: "${prompt}". 
+                            Return ONLY a JSON array of objects. Each object should have:
+                            - id: string (unique)
+                            - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
+                            - label: string
+                            - placeholder: string (optional)
+                            - options: array of strings (only for radio/checkbox/select)
+                            - required: boolean
+                            Do not include any markdown formatting or explanation.`
+                        }],
+                        max_tokens: 1024,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!grokResponse.ok) {
+                    const errorData = await grokResponse.json().catch(() => ({}));
+                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
+                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+                    // If it's a model not found error, try next model
+                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
+                        console.log(`Model ${model} not available, trying next...`);
+                        continue;
+                    }
+                    throw new Error(lastError);
+                }
+
+                const data = await grokResponse.json();
+                const textResponse = data.choices[0]?.message?.content || '';
+                
+                if (!textResponse) {
+                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
+                    throw new Error('Grok API returned empty response');
+                }
+                
+                // Parse the JSON from the content
+                const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
+                let fields;
+                try {
+                    fields = JSON.parse(jsonBlock);
+                } catch (parseErr) {
+                    console.error("Failed to parse Grok response as JSON:", parseErr);
+                    console.error("Raw response:", textResponse);
+                    throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
+                }
+
+                return res.json({ 
+                    fields, 
+                    provider: 'grok',
+                    fallback: isFallback,
+                    message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+                });
+            } catch (modelErr) {
+                lastError = modelErr.message;
+                // If this is the last model, throw the error
+                if (model === models[models.length - 1]) {
+                    throw modelErr;
+                }
+                // Otherwise, continue to next model
+                console.log(`Model ${model} failed, trying next...`);
+            }
+        }
+        
+        // If all models failed
+        throw new Error(lastError || 'All Grok models failed');
 
         if (!grokResponse.ok) {
             const errorData = await grokResponse.json().catch(() => ({}));
@@ -498,52 +556,83 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
         
         Only return the JSON array, no other text.`;
 
-        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'grok-2-1212',
-                messages: [{
-                    role: 'user',
-                    content: prompt
-                }],
-                max_tokens: 4000,
-                temperature: 0.7
-            })
-        });
-
-        if (!grokResponse.ok) {
-            const errorData = await grokResponse.json().catch(() => ({}));
-            throw new Error(errorData.error?.message || `Grok API error: ${grokResponse.status}`);
-        }
-
-        const data = await grokResponse.json();
-        const content = data.choices[0]?.message?.content || '';
-        let fields = [];
+        // Try different model names in order
+        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
+        let lastError = null;
         
-        try {
-            // Try to extract JSON from code blocks if present
-            const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
-            fields = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(content);
-        } catch (error) {
-            console.error('Error parsing Grok response:', error);
-            return res.status(500).json({ 
-                error: 'Failed to parse Grok AI response',
-                details: error.message,
-                rawResponse: content
-            });
-        }
+        for (const model of models) {
+            try {
+                console.log(`Trying Grok model: ${model}`);
+                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{
+                            role: 'user',
+                            content: prompt
+                        }],
+                        max_tokens: 4000,
+                        temperature: 0.7
+                    })
+                });
 
-        return res.json({ 
-            success: true, 
-            fields, 
-            provider: 'grok',
-            fallback: isFallback,
-            message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
-        });
+                if (!grokResponse.ok) {
+                    const errorData = await grokResponse.json().catch(() => ({}));
+                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
+                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+                    // If it's a model not found error, try next model
+                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
+                        console.log(`Model ${model} not available, trying next...`);
+                        continue;
+                    }
+                    throw new Error(lastError);
+                }
+
+                const data = await grokResponse.json();
+                const content = data.choices[0]?.message?.content || '';
+                
+                if (!content) {
+                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
+                    throw new Error('Grok API returned empty response');
+                }
+                
+                let fields = [];
+                try {
+                    // Try to extract JSON from code blocks if present
+                    const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
+                    const jsonToParse = jsonMatch ? jsonMatch[0] : content;
+                    const jsonBlock = jsonToParse.replace(/```json\n?|\n?```/g, '').trim();
+                    fields = JSON.parse(jsonBlock);
+                } catch (error) {
+                    console.error('Error parsing Grok response:', error);
+                    console.error('Raw response:', content);
+                    throw new Error(`Failed to parse Grok AI response: ${error.message}`);
+                }
+
+                return res.json({ 
+                    success: true, 
+                    fields, 
+                    provider: 'grok',
+                    fallback: isFallback,
+                    message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+                });
+            } catch (modelErr) {
+                lastError = modelErr.message;
+                // If this is the last model, throw the error
+                if (model === models[models.length - 1]) {
+                    throw modelErr;
+                }
+                // Otherwise, continue to next model
+                console.log(`Model ${model} failed, trying next...`);
+            }
+        }
+        
+        // If all models failed
+        throw new Error(lastError || 'All Grok models failed');
     } catch (err) {
         console.error("Grok API Error:", err);
         
@@ -583,59 +672,83 @@ router.post('/ai/generate-grok', async (req, res) => {
     }
 
     try {
-        // Grok API uses OpenAI-compatible endpoint
-        const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'grok-2-1212',
-                messages: [{
-                    role: 'user',
-                    content: `Generate a list of form fields for a form about: "${prompt}". 
-                    Return ONLY a JSON array of objects. Each object should have:
-                    - id: string (unique)
-                    - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
-                    - label: string
-                    - placeholder: string (optional)
-                    - options: array of strings (only for radio/checkbox/select)
-                    - required: boolean
-                    Do not include any markdown formatting or explanation.`
-                }],
-                max_tokens: 1024,
-                temperature: 0.7
-            })
-        });
-
-        if (!grokResponse.ok) {
-            const errorData = await grokResponse.json().catch(() => ({}));
-            console.error("Grok API Error Response:", JSON.stringify(errorData, null, 2));
-            const errorMsg = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
-            throw new Error(errorMsg);
-        }
-
-        const data = await grokResponse.json();
-        const textResponse = data.choices[0]?.message?.content || '';
+        // Try different model names in order
+        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
+        let lastError = null;
         
-        if (!textResponse) {
-            console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
-            throw new Error('Grok API returned empty response');
+        for (const model of models) {
+            try {
+                console.log(`Trying Grok model: ${model}`);
+                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                    },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [{
+                            role: 'user',
+                            content: `Generate a list of form fields for a form about: "${prompt}". 
+                            Return ONLY a JSON array of objects. Each object should have:
+                            - id: string (unique)
+                            - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
+                            - label: string
+                            - placeholder: string (optional)
+                            - options: array of strings (only for radio/checkbox/select)
+                            - required: boolean
+                            Do not include any markdown formatting or explanation.`
+                        }],
+                        max_tokens: 1024,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!grokResponse.ok) {
+                    const errorData = await grokResponse.json().catch(() => ({}));
+                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
+                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+                    // If it's a model not found error, try next model
+                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
+                        console.log(`Model ${model} not available, trying next...`);
+                        continue;
+                    }
+                    throw new Error(lastError);
+                }
+
+                const data = await grokResponse.json();
+                const textResponse = data.choices[0]?.message?.content || '';
+                
+                if (!textResponse) {
+                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
+                    throw new Error('Grok API returned empty response');
+                }
+                
+                // Parse the JSON from the content
+                const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
+                let fields;
+                try {
+                    fields = JSON.parse(jsonBlock);
+                } catch (parseErr) {
+                    console.error("Failed to parse Grok response as JSON:", parseErr);
+                    console.error("Raw response:", textResponse);
+                    throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
+                }
+
+                return res.json({ fields, provider: 'grok' });
+            } catch (modelErr) {
+                lastError = modelErr.message;
+                // If this is the last model, throw the error
+                if (model === models[models.length - 1]) {
+                    throw modelErr;
+                }
+                // Otherwise, continue to next model
+                console.log(`Model ${model} failed, trying next...`);
+            }
         }
         
-        // Parse the JSON from the content
-        const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
-        let fields;
-        try {
-            fields = JSON.parse(jsonBlock);
-        } catch (parseErr) {
-            console.error("Failed to parse Grok response as JSON:", parseErr);
-            console.error("Raw response:", textResponse);
-            throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
-        }
-
-        res.json({ fields, provider: 'grok' });
+        // If all models failed
+        throw new Error(lastError || 'All Grok models failed');
     } catch (err) {
         console.error("Grok API Error:", err);
         
