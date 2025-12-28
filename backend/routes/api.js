@@ -105,7 +105,7 @@ router.get('/forms/:id/analytics', async (req, res) => {
 
 // --- AI ROUTES ---
 
-// Generate form fields using Claude (default) with automatic Grok fallback
+// Generate form fields using Claude API only (no fallback)
 router.post('/ai/generate', async (req, res) => {
     try {
         const { prompt } = req.body;
@@ -115,11 +115,10 @@ router.post('/ai/generate', async (req, res) => {
         }
         
         if (!process.env.CLAUDE_API_KEY) {
-            // If no Claude key, try Grok directly
-            if (process.env.GROK_API_KEY) {
-                return await tryGrokAPI(prompt, res);
-            }
-            return res.status(503).json({ error: 'Claude API Key missing in backend' });
+            return res.status(503).json({ 
+                error: 'Claude API Key missing', 
+                message: 'Claude API key is not configured. Please set CLAUDE_API_KEY in your Render environment variables or .env file.'
+            });
         }
 
         try {
@@ -148,51 +147,10 @@ router.post('/ai/generate', async (req, res) => {
         } catch (err) {
             console.error("Claude API Error:", err);
             
-            // Safely stringify error (might fail on circular references)
-            let errorString = '';
-            let errorMessage = '';
-            try {
-                errorString = JSON.stringify(err).toLowerCase();
-                errorMessage = err.error?.error?.message || err.message || err.toString() || '';
-            } catch (e) {
-                errorMessage = err.message || err.toString() || String(err);
-                errorString = errorMessage.toLowerCase();
-            }
-            
+            const errorMessage = err.error?.error?.message || err.message || err.toString() || '';
             const statusCode = err.status || err.statusCode || 500;
             
-            console.error("Error status:", statusCode);
-            console.error("Error message:", errorMessage);
-            console.error("Grok API Key available:", !!process.env.GROK_API_KEY);
-            
-            // Check if it's a credit error (400 status OR contains credit message)
-            const isCreditError = (
-                statusCode === 400 && (
-                    errorMessage.toLowerCase().includes('credit balance') || 
-                    errorMessage.toLowerCase().includes('credit') ||
-                    errorString.includes('credit balance') ||
-                    errorString.includes('credit')
-                )
-            ) || (
-                errorMessage.toLowerCase().includes('credit balance') || 
-                errorMessage.toLowerCase().includes('credit') ||
-                errorString.includes('credit balance') ||
-                errorString.includes('credit')
-            );
-            
-            console.log("Is credit error?", isCreditError);
-            
-            // If Claude fails due to credit issues OR any 400 error, automatically try Grok
-            if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
-                console.log("Claude API error detected, automatically falling back to Grok API...");
-                const grokResult = await tryGrokAPI(prompt, res, true).catch(grokErr => {
-                    console.error("Grok fallback also failed:", grokErr);
-                    return null; // Return null to indicate failure
-                });
-                if (grokResult) return; // If Grok succeeded, response was already sent
-            }
-            
-            // Handle other Claude API errors
+            // Handle Claude API errors
             if (statusCode === 401) {
                 return res.status(503).json({ 
                     error: 'Claude API authentication failed', 
@@ -200,27 +158,18 @@ router.post('/ai/generate', async (req, res) => {
                 });
             }
             
-            // If any error and Grok is available, try Grok as fallback
-            if (process.env.GROK_API_KEY) {
-                console.log("Claude API failed, trying Grok as fallback...");
-                const grokResult = await tryGrokAPI(prompt, res, true).catch(grokErr => {
-                    console.error("Grok fallback also failed:", grokErr);
-                    return null; // Return null to indicate failure
-                });
-                if (grokResult) return; // If Grok succeeded, response was already sent
-            } else if (isCreditError || statusCode === 400) {
-                // If Claude credits are low but Grok is not configured, show helpful message
+            if (statusCode === 400) {
                 return res.status(503).json({ 
-                    error: 'Claude API credits insufficient and Grok fallback unavailable', 
-                    message: 'Your Claude API credits are low. To enable automatic fallback to Grok API, please set GROK_API_KEY in your Render environment variables.',
-                    details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
+                    error: 'Claude API request failed', 
+                    message: errorMessage || 'Invalid request to Claude API. Please check your API key and credits.',
+                    details: 'If you have low credits, you can try using Grok API instead by selecting it in the form builder.'
                 });
             }
             
             res.status(500).json({ 
-                error: 'Failed to generate form', 
+                error: 'Failed to generate form with Claude', 
                 details: errorMessage,
-                message: 'An error occurred while generating the form. Please try again or create the form manually.'
+                message: 'An error occurred while generating the form with Claude API. Please try again or use Grok API instead.'
             });
         }
     } catch (outerErr) {
@@ -234,16 +183,13 @@ router.post('/ai/generate', async (req, res) => {
     }
 });
 
-// Helper function to call Grok API
-async function tryGrokAPI(prompt, res, isFallback = false) {
+// Helper function to call Grok API (standalone, no fallback)
+async function tryGrokAPI(prompt, res) {
     if (!process.env.GROK_API_KEY) {
         console.error("Grok API Key not found in environment variables");
-        const errorMsg = isFallback 
-            ? 'Grok API key is not configured. Claude API failed and Grok fallback is unavailable. Please set GROK_API_KEY in Render environment variables.'
-            : 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.';
         return res.status(503).json({ 
             error: 'Grok API Key missing',
-            message: errorMsg,
+            message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
             details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
         });
     }
@@ -314,9 +260,7 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
 
                 return res.json({ 
                     fields, 
-                    provider: 'grok',
-                    fallback: isFallback,
-                    message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+                    provider: 'grok'
                 });
             } catch (modelErr) {
                 lastError = modelErr.message;
@@ -331,50 +275,8 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
         
         // If all models failed
         throw new Error(lastError || 'All Grok models failed');
-
-        if (!grokResponse.ok) {
-            const errorData = await grokResponse.json().catch(() => ({}));
-            console.error("Grok API Error Response:", JSON.stringify(errorData, null, 2));
-            const errorMsg = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
-            throw new Error(errorMsg);
-        }
-
-        const data = await grokResponse.json();
-        const textResponse = data.choices[0]?.message?.content || '';
-        
-        if (!textResponse) {
-            console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
-            throw new Error('Grok API returned empty response');
-        }
-        
-        // Parse the JSON from the content
-        const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
-        let fields;
-        try {
-            fields = JSON.parse(jsonBlock);
-        } catch (parseErr) {
-            console.error("Failed to parse Grok response as JSON:", parseErr);
-            console.error("Raw response:", textResponse);
-            throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
-        }
-
-        return res.json({ 
-            fields, 
-            provider: 'grok',
-            fallback: isFallback,
-            message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
-        });
     } catch (err) {
         console.error("Grok API Error:", err);
-        
-        if (isFallback) {
-            // If Grok also fails during fallback, return error
-            return res.status(500).json({ 
-                error: 'Both Claude and Grok API failed', 
-                details: err.message,
-                message: 'Failed to generate form with both AI providers. Please try again or create the form manually.'
-            });
-        }
         
         if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
             return res.status(503).json({ 
@@ -391,13 +293,20 @@ async function tryGrokAPI(prompt, res, isFallback = false) {
     }
 }
 
-// AI-Generated Form Suggestion
+// AI-Generated Form Suggestion (Claude API only - no fallback)
 router.post('/ai/generate-form', async (req, res) => {
     try {
         const { topic, description, numQuestions = 5 } = req.body;
         
         if (!topic) {
             return res.status(400).json({ error: 'Topic is required' });
+        }
+
+        if (!process.env.CLAUDE_API_KEY) {
+            return res.status(503).json({ 
+                error: 'Claude API Key missing', 
+                message: 'Claude API key is not configured. Please set CLAUDE_API_KEY in your Render environment variables or .env file.'
+            });
         }
 
         const prompt = `You are an expert form designer. Create a form with ${numQuestions} questions about "${topic}"${description ? ` with the following details: ${description}` : ''}.
@@ -423,14 +332,6 @@ router.post('/ai/generate-form', async (req, res) => {
         ]
         
         Only return the JSON array, no other text.`;
-
-        if (!process.env.CLAUDE_API_KEY) {
-            // If no Claude key, try Grok directly
-            if (process.env.GROK_API_KEY) {
-                return tryGrokAPIForForm(topic, description, numQuestions, res);
-            }
-            return res.status(503).json({ error: 'Claude API Key missing in backend' });
-        }
 
         try {
             const response = await anthropic.messages.create({
@@ -464,39 +365,11 @@ router.post('/ai/generate-form', async (req, res) => {
             return res.json({ success: true, fields, provider: 'claude' });
         } catch (error) {
             console.error('Claude API generation error:', error);
-            console.error("Error details:", JSON.stringify(error, null, 2));
-            console.error("Error status:", error.status);
-            console.error("Error statusCode:", error.statusCode);
             
-            // Check for credit error in multiple ways (Anthropic error structure can vary)
             const errorMessage = error.error?.error?.message || error.message || error.toString() || '';
-            const errorString = JSON.stringify(error).toLowerCase();
             const statusCode = error.status || error.statusCode || 500;
             
-            // Check if it's a credit error (400 status OR contains credit message)
-            const isCreditError = (
-                statusCode === 400 && (
-                    errorMessage.toLowerCase().includes('credit balance') || 
-                    errorMessage.toLowerCase().includes('credit') ||
-                    errorString.includes('credit balance') ||
-                    errorString.includes('credit')
-                )
-            ) || (
-                errorMessage.toLowerCase().includes('credit balance') || 
-                errorMessage.toLowerCase().includes('credit') ||
-                errorString.includes('credit balance') ||
-                errorString.includes('credit')
-            );
-            
-            console.log("Status code:", statusCode, "Is credit error?", isCreditError, "Grok available?", !!process.env.GROK_API_KEY);
-            
-            // If Claude fails due to credit issues OR any 400 error, automatically try Grok
-            if ((isCreditError || statusCode === 400) && process.env.GROK_API_KEY) {
-                console.log("Claude API error detected, automatically falling back to Grok API...");
-                return tryGrokAPIForForm(topic, description, numQuestions, res, true);
-            }
-            
-            // Handle other Claude API errors
+            // Handle Claude API errors
             if (statusCode === 401) {
                 return res.status(503).json({ 
                     error: 'Claude API authentication failed', 
@@ -504,26 +377,32 @@ router.post('/ai/generate-form', async (req, res) => {
                 });
             }
             
-            // If any error and Grok is available, try Grok as fallback
-            if (process.env.GROK_API_KEY) {
-                console.log("Claude API failed, trying Grok as fallback...");
-                return tryGrokAPIForForm(topic, description, numQuestions, res, true);
+            if (statusCode === 400) {
+                return res.status(503).json({ 
+                    error: 'Claude API request failed', 
+                    message: errorMessage || 'Invalid request to Claude API. Please check your API key and credits.',
+                    details: 'If you have low credits, you can try using Grok API instead by selecting it in the form builder.'
+                });
             }
             
-            throw error; // Re-throw if no fallback available
+            res.status(500).json({ 
+                error: 'Failed to generate form with Claude', 
+                details: errorMessage,
+                message: 'An error occurred while generating the form with Claude API. Please try again or use Grok API instead.'
+            });
         }
     } catch (error) {
         console.error('AI generation error:', error);
         res.status(500).json({ 
             error: 'Failed to generate form with AI',
             details: error.message,
-            message: 'An error occurred while generating the form. Please try again or create the form manually.'
+            message: 'An unexpected error occurred. Please try again or create the form manually.'
         });
     }
 });
 
 // Helper function to call Grok API for generate-form endpoint
-async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallback = false) {
+async function tryGrokAPIForForm(topic, description, numQuestions, res) {
     if (!process.env.GROK_API_KEY) {
         return res.status(503).json({ 
             error: 'Grok API Key missing',
@@ -616,9 +495,7 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
                 return res.json({ 
                     success: true, 
                     fields, 
-                    provider: 'grok',
-                    fallback: isFallback,
-                    message: isFallback ? 'Claude API credits low, used Grok API instead' : undefined
+                    provider: 'grok'
                 });
             } catch (modelErr) {
                 lastError = modelErr.message;
@@ -635,14 +512,6 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res, isFallba
         throw new Error(lastError || 'All Grok models failed');
     } catch (err) {
         console.error("Grok API Error:", err);
-        
-        if (isFallback) {
-            return res.status(500).json({ 
-                error: 'Both Claude and Grok API failed', 
-                details: err.message,
-                message: 'Failed to generate form with both AI providers. Please try again or create the form manually.'
-            });
-        }
         
         if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
             return res.status(503).json({ 
