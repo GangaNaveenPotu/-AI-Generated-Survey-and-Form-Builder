@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+
 import API_ENDPOINTS from '../config/api';
 
 const FormRenderer = () => {
@@ -97,21 +97,30 @@ const FormRenderer = () => {
 
     if (loading) {
         return (
-            <div className="flex h-screen items-center justify-center bg-gray-50">
-                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-blue-600"></div>
+            <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', fontFamily: 'Roboto, Arial, sans-serif', backgroundColor: '#F8FAFC' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', backgroundColor: '#FFFFFF', padding: '40px', borderRadius: '20px', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)', border: '1px solid #E2E8F0' }}>
+                    <div className="animate-spin rounded-full h-10 w-10 border-4" style={{ borderColor: 'rgba(99, 102, 241, 0.2)', borderTopColor: '#6366F1' }}></div>
+                    <p style={{ fontSize: '16px', color: '#0F172A', fontWeight: 500 }}>Loading form...</p>
+                </div>
             </div>
         );
     }
 
     if (error) {
         return (
-            <div className="flex h-screen items-center justify-center bg-gray-50 p-4">
-                <div className="bg-white p-8 rounded-2xl shadow-lg text-center max-w-md w-full">
-                    <div className="bg-red-50 p-4 rounded-full inline-block mb-4">
-                        <AlertCircle className="text-red-500 h-8 w-8" />
+            <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', padding: '16px', fontFamily: 'Roboto, Arial, sans-serif', backgroundColor: '#F8FAFC' }}>
+                <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '20px', maxWidth: '448px', width: '100%', padding: '40px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '20px' }}>
+                        <div style={{ margin: '0 auto', height: '64px', width: '64px', borderRadius: '50%', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <svg style={{ height: '32px', width: '32px', color: '#EF4444' }} fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                            </svg>
+                        </div>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Unavailable</h2>
-                    <p className="text-gray-500">{error}</p>
+                    <h2 style={{ fontFamily: 'Google Sans, Roboto, Arial, sans-serif', fontSize: '24px', fontWeight: 600, color: '#0F172A', marginBottom: '12px' }}>
+                        Form unavailable
+                    </h2>
+                    <p style={{ fontSize: '16px', color: '#64748B', lineHeight: '1.6' }}>{error}</p>
                 </div>
             </div>
         );
@@ -119,16 +128,45 @@ const FormRenderer = () => {
 
     if (submitted) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="bg-white p-10 rounded-2xl shadow-xl text-center max-w-lg w-full transform transition-all animate-in fade-in zoom-in duration-300">
-                    <div className="bg-green-50 p-4 rounded-full inline-block mb-6">
-                        <CheckCircle className="text-green-500 h-16 w-16" />
+            <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', fontFamily: 'Roboto, Arial, sans-serif', backgroundColor: '#F8FAFC' }}>
+                <div style={{ backgroundColor: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '24px', maxWidth: '560px', width: '100%', padding: '48px', textAlign: 'center', boxShadow: '0 20px 60px rgba(0, 0, 0, 0.1)' }}>
+                    <div style={{ marginBottom: '32px' }}>
+                        <div style={{ margin: '0 auto', height: '80px', width: '80px', borderRadius: '50%', background: 'linear-gradient(135deg, #6366F1 0%, #22D3EE 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(99, 102, 241, 0.4)' }}>
+                            <svg style={{ height: '48px', width: '48px', color: '#ffffff' }} fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                        </div>
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900 mb-4">Thank You!</h2>
-                    <p className="text-gray-600 mb-8 text-lg">Your response has been successfully recorded.</p>
+                    <h2 style={{ fontFamily: 'Google Sans, Roboto, Arial, sans-serif', fontSize: '28px', fontWeight: 600, color: '#0F172A', marginBottom: '16px' }}>
+                        Your response has been recorded! 🎉
+                    </h2>
+                    <p style={{ fontSize: '16px', color: '#64748B', marginBottom: '32px', lineHeight: '1.6' }}>
+                        Thank you for your response. We appreciate your time.
+                    </p>
                     <a
                         href="/"
-                        className="inline-block bg-blue-600 text-white px-8 py-3 rounded-xl font-medium hover:bg-blue-700 transition shadow-lg hover:shadow-xl hover:-translate-y-0.5"
+                        style={{
+                            display: 'inline-block',
+                            backgroundColor: '#6366F1',
+                            color: '#ffffff',
+                            padding: '14px 32px',
+                            borderRadius: '12px',
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                            transition: 'all 0.3s',
+                            boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.transform = 'translateY(-2px)';
+                            e.target.style.backgroundColor = '#22D3EE';
+                            e.target.style.boxShadow = '0 6px 20px rgba(34, 211, 238, 0.5)';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.transform = 'translateY(0)';
+                            e.target.style.backgroundColor = '#6366F1';
+                            e.target.style.boxShadow = '0 4px 15px rgba(99, 102, 241, 0.4)';
+                        }}
                     >
                         Create your own form
                     </a>
@@ -138,137 +176,308 @@ const FormRenderer = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-            <div className="max-w-2xl mx-auto">
-                <div className="bg-white shadow-xl rounded-2xl overflow-hidden border-t-8 border-blue-600">
-                    <div className="px-8 py-10 border-b border-gray-100">
-                        <h1 className="text-4xl font-extrabold text-gray-900 mb-3">{form.title}</h1>
-                        <p className="text-lg text-gray-500 leading-relaxed">{form.description}</p>
-                    </div>
+        <>
+            <style>{`
+                input::placeholder,
+                textarea::placeholder {
+                    color: #94A3B8;
+                }
+            `}</style>
+            <div className="min-h-screen" style={{ fontFamily: 'Roboto, Arial, sans-serif', paddingTop: '40px', paddingBottom: '40px', backgroundColor: '#F8FAFC' }}>
+                <div style={{ maxWidth: '700px', margin: '0 auto', padding: '0 24px' }}>
+                {/* Form Header - 30% Secondary (Light Gray) */}
+                <div style={{ 
+                    padding: '32px 32px 24px 32px', 
+                    borderBottom: 'none', 
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0', 
+                    borderTopLeftRadius: '20px',
+                    borderTopRightRadius: '20px',
+                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.08)',
+                    borderBottom: '3px solid #6366F1'
+                }}>
+                    <h1 style={{ fontFamily: 'Google Sans, Roboto, Arial, sans-serif', fontSize: '36px', fontWeight: 600, lineHeight: '135%', marginBottom: '12px', color: '#0F172A' }}>
+                        {form.title}
+                    </h1>
+                    {form.description && (
+                        <p style={{ fontSize: '16px', lineHeight: '24px', marginTop: '8px', color: '#64748B' }}>{form.description}</p>
+                    )}
+                </div>
 
-                    <form onSubmit={handleSubmit} className="px-8 py-10 space-y-8">
-                        {form.fields.map(field => (
-                            <div key={field.id || field._id} className="space-y-3">
-                                <label className="block text-base font-semibold text-gray-800">
-                                    {field.label} {field.required && <span className="text-red-500 ml-1">*</span>}
+                {/* Form Content - 30% Secondary (White) */}
+                <form onSubmit={handleSubmit} style={{ 
+                    borderTop: 'none', 
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0', 
+                    borderTop: 'none',
+                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.08)'
+                }}>
+                    {form.fields.map((field, index) => (
+                        <div key={field.id || field._id} style={{ padding: '28px 32px', borderBottom: '1px solid #E2E8F0' }}>
+                            <div style={{ marginBottom: '12px' }}>
+                                <label style={{ fontSize: '16px', fontWeight: 500, lineHeight: '24px', color: '#0F172A', display: 'block' }}>
+                                    {field.label}
+                                    {field.required && <span style={{ color: '#22D3EE', marginLeft: '4px', fontWeight: 600 }}>*</span>}
                                 </label>
+                            </div>
 
-                                {field.type === 'text' && (
+                            {field.type === 'text' && (
+                                <div style={{ marginTop: '8px' }}>
                                     <input
                                         type="text"
                                         required={field.required}
-                                        placeholder={field.placeholder}
-                                        className="w-full border-gray-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-700"
+                                        placeholder={field.placeholder || ''}
+                                        className="w-full bg-transparent"
+                                        style={{
+                                            border: 'none',
+                                            borderBottom: '1px solid #dadce0',
+                                            paddingBottom: '4px',
+                                            paddingTop: '8px',
+                                            fontSize: '14px',
+                                            color: '#202124',
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
+                                            fontFamily: 'Roboto, Arial, sans-serif'
+                                        }}
+                                        onFocus={(e) => {
+                                            e.target.style.borderBottom = '2px solid #1a73e8';
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.borderBottom = '1px solid #dadce0';
+                                        }}
                                         onChange={(e) => handleChange(field.id, e.target.value)}
+                                        value={answers[field.id] || ''}
                                     />
-                                )}
+                                </div>
+                            )}
 
-                                {field.type === 'textarea' && (
+                            {field.type === 'textarea' && (
+                                <div style={{ marginTop: '8px' }}>
                                     <textarea
                                         required={field.required}
-                                        placeholder={field.placeholder}
+                                        placeholder={field.placeholder || ''}
                                         rows={4}
-                                        className="w-full border-gray-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-700 resize-none"
+                                        className="w-full resize-none"
+                                        style={{
+                                            border: '2px solid #E2E8F0',
+                                            borderRadius: '12px',
+                                            padding: '12px',
+                                            fontSize: '15px',
+                                            color: '#0F172A',
+                                            outline: 'none',
+                                            fontFamily: 'Roboto, Arial, sans-serif',
+                                            transition: 'all 0.3s',
+                                            backgroundColor: '#FFFFFF',
+                                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                                        }}
+                                        onFocus={(e) => {
+                                            e.target.style.border = '2px solid #6366F1';
+                                            e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.border = '2px solid #E2E8F0';
+                                            e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                                        }}
                                         onChange={(e) => handleChange(field.id, e.target.value)}
+                                        value={answers[field.id] || ''}
                                     />
-                                )}
+                                </div>
+                            )}
 
-                                {field.type === 'number' && (
+                            {field.type === 'number' && (
+                                <div style={{ marginTop: '8px' }}>
                                     <input
                                         type="number"
                                         required={field.required}
-                                        className="w-full border-gray-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-700"
+                                        className="w-full bg-transparent"
+                                        style={{
+                                            border: 'none',
+                                            borderBottom: '1px solid #dadce0',
+                                            paddingBottom: '4px',
+                                            paddingTop: '8px',
+                                            fontSize: '14px',
+                                            color: '#202124',
+                                            outline: 'none',
+                                            transition: 'border-color 0.2s',
+                                            fontFamily: 'Roboto, Arial, sans-serif'
+                                        }}
+                                        onFocus={(e) => {
+                                            e.target.style.borderBottom = '2px solid #1a73e8';
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.borderBottom = '1px solid #dadce0';
+                                        }}
                                         onChange={(e) => handleChange(field.id, e.target.value)}
+                                        value={answers[field.id] || ''}
                                     />
-                                )}
+                                </div>
+                            )}
 
-                                {field.type === 'select' && (
-                                    <div className="relative">
-                                        <select
-                                            required={field.required}
-                                            className="w-full border-gray-300 rounded-xl shadow-sm border p-3 focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all text-gray-700 appearance-none bg-white"
-                                            onChange={(e) => handleChange(field.id, e.target.value)}
-                                        >
-                                            <option value="">Select an option</option>
-                                            {field.options?.map(opt => (
-                                                <option key={opt} value={opt}>{opt}</option>
-                                            ))}
-                                        </select>
-                                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                                            <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" /></svg>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {field.type === 'radio' && (
-                                    <div className="space-y-3 pt-1">
+                            {field.type === 'select' && (
+                                <div className="relative" style={{ marginTop: '8px' }}>
+                                    <select
+                                        required={field.required}
+                                        className="w-full"
+                                        style={{
+                                            border: '2px solid #E2E8F0',
+                                            borderRadius: '12px',
+                                            padding: '12px 40px 12px 12px',
+                                            fontSize: '15px',
+                                            color: '#0F172A',
+                                            backgroundColor: '#FFFFFF',
+                                            outline: 'none',
+                                            appearance: 'none',
+                                            fontFamily: 'Roboto, Arial, sans-serif',
+                                            transition: 'all 0.3s',
+                                            cursor: 'pointer',
+                                            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)'
+                                        }}
+                                        onFocus={(e) => {
+                                            e.target.style.border = '2px solid #6366F1';
+                                            e.target.style.boxShadow = '0 0 0 3px rgba(99, 102, 241, 0.1)';
+                                        }}
+                                        onBlur={(e) => {
+                                            e.target.style.border = '2px solid #E2E8F0';
+                                            e.target.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+                                        }}
+                                        onChange={(e) => handleChange(field.id, e.target.value)}
+                                        value={answers[field.id] || ''}
+                                    >
+                                        <option value="" style={{ color: '#64748B', backgroundColor: '#FFFFFF' }}>-- Select --</option>
                                         {field.options?.map(opt => (
-                                            <label key={opt} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors group">
+                                            <option key={opt} value={opt} style={{ color: '#0F172A', backgroundColor: '#FFFFFF' }}>{opt}</option>
+                                        ))}
+                                    </select>
+                                    <div className="pointer-events-none absolute" style={{ right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#5f6368' }}>
+                                        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M7 10l5 5 5-5z"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            )}
+
+                            {field.type === 'radio' && (
+                                <div style={{ marginTop: '8px', paddingTop: '4px' }}>
+                                    {field.options?.map(opt => (
+                                        <label key={opt} className="flex items-center cursor-pointer" style={{ padding: '4px 0', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                                            <input
+                                                type="radio"
+                                                name={field.id}
+                                                value={opt}
+                                                required={field.required}
+                                                checked={answers[field.id] === opt}
+                                                style={{
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    margin: '0',
+                                                    cursor: 'pointer',
+                                                    accentColor: '#6366F1'
+                                                }}
+                                                onChange={(e) => handleChange(field.id, e.target.value)}
+                                            />
+                                            <span className="ml-3" style={{ marginLeft: '12px', fontSize: '15px', color: '#0F172A', lineHeight: '24px', fontWeight: 400 }}>{opt}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+
+                            {field.type === 'checkbox' && (
+                                <div style={{ marginTop: '8px', paddingTop: '4px' }}>
+                                    {field.options?.map(opt => {
+                                        const currentValues = answers[field.id] || [];
+                                        const valueArray = Array.isArray(currentValues) ? currentValues : [];
+                                        const isChecked = valueArray.includes(opt);
+                                        
+                                        return (
+                                            <label key={opt} className="flex items-center cursor-pointer" style={{ padding: '4px 0', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                                                 <input
-                                                    type="radio"
+                                                    type="checkbox"
                                                     name={field.id}
                                                     value={opt}
-                                                    required={field.required}
-                                                    checked={answers[field.id] === opt}
-                                                    className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                                    onChange={(e) => handleChange(field.id, e.target.value)}
+                                                    checked={isChecked}
+                                                    style={{
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        margin: '0',
+                                                        cursor: 'pointer',
+                                                        accentColor: '#6366F1'
+                                                    }}
+                                                    onChange={(e) => handleCheckboxChange(field.id, opt, e.target.checked)}
                                                 />
-                                                <span className="ml-3 text-gray-700 font-medium group-hover:text-gray-900">{opt}</span>
+                                                <span className="ml-3" style={{ marginLeft: '12px', fontSize: '15px', color: '#0F172A', lineHeight: '24px', fontWeight: 400 }}>{opt}</span>
                                             </label>
-                                        ))}
-                                    </div>
-                                )}
-
-                                {field.type === 'checkbox' && (
-                                    <div className="space-y-3 pt-1">
-                                        {field.options?.map(opt => {
-                                            const currentValues = answers[field.id] || [];
-                                            const valueArray = Array.isArray(currentValues) ? currentValues : [];
-                                            const isChecked = valueArray.includes(opt);
-                                            
-                                            return (
-                                                <label key={opt} className="flex items-center p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors group">
-                                                    <input
-                                                        type="checkbox"
-                                                        name={field.id}
-                                                        value={opt}
-                                                        checked={isChecked}
-                                                        className="h-5 w-5 text-blue-600 focus:ring-blue-500 border-gray-300"
-                                                        onChange={(e) => handleCheckboxChange(field.id, opt, e.target.checked)}
-                                                    />
-                                                    <span className="ml-3 text-gray-700 font-medium group-hover:text-gray-900">{opt}</span>
-                                                </label>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-
-                        <div className="pt-6">
-                            <button
-                                type="submit"
-                                disabled={submitting}
-                                className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg hover:bg-blue-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {submitting ? (
-                                    <>
-                                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                                        Submitting...
-                                    </>
-                                ) : (
-                                    'Submit Response'
-                                )}
-                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
-                    </form>
-                </div>
+                    ))}
 
-                <div className="text-center mt-8 text-gray-400 text-sm">
-                    Powered by AI Form Builder
+                    {/* Submit Button Section - 10% Accent (Electric Indigo) */}
+                    <div style={{ padding: '32px', display: 'flex', justifyContent: 'flex-end', gap: '12px', borderTop: '1px solid #E2E8F0' }}>
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            style={{
+                                backgroundColor: submitting ? '#94A3B8' : '#6366F1',
+                                color: '#ffffff',
+                                padding: '14px 32px',
+                                borderRadius: '12px',
+                                fontSize: '16px',
+                                fontWeight: 600,
+                                border: 'none',
+                                cursor: submitting ? 'not-allowed' : 'pointer',
+                                opacity: submitting ? 0.7 : 1,
+                                fontFamily: 'Roboto, Arial, sans-serif',
+                                transition: 'all 0.3s',
+                                boxShadow: submitting ? 'none' : '0 4px 15px rgba(99, 102, 241, 0.4)'
+                            }}
+                            onMouseEnter={(e) => {
+                                if (!submitting) {
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.backgroundColor = '#22D3EE';
+                                    e.target.style.boxShadow = '0 6px 20px rgba(34, 211, 238, 0.5)';
+                                }
+                            }}
+                            onMouseLeave={(e) => {
+                                if (!submitting) {
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.backgroundColor = '#6366F1';
+                                    e.target.style.boxShadow = '0 4px 15px rgba(99, 102, 241, 0.4)';
+                                }
+                            }}
+                        >
+                            {submitting ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                                    Submitting...
+                                </span>
+                            ) : (
+                                'Submit ✨'
+                            )}
+                        </button>
+                    </div>
+                </form>
+
+                {/* Footer - 30% Secondary */}
+                <div style={{ 
+                    borderTop: 'none', 
+                    padding: '20px 32px', 
+                    textAlign: 'center', 
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0', 
+                    borderTop: 'none',
+                    borderBottomLeftRadius: '20px',
+                    borderBottomRightRadius: '20px',
+                    boxShadow: '0 10px 40px rgba(0, 0, 0, 0.08)'
+                }}>
+                    <p style={{ fontSize: '13px', color: '#64748B', margin: 0, fontWeight: 500 }}>
+                        ✨ Created with <span style={{ color: '#6366F1', fontWeight: 600 }}>AI Form Builder</span>
+                    </p>
                 </div>
             </div>
         </div>
+        </>
     );
 };
 

@@ -12,23 +12,28 @@ A full-stack MERN application that allows users to create, manage, and analyze s
 ### Try It Now!
 
 1. Visit the [live frontend](https://ai-form-builder-frontend.onrender.com)
-2. Create a new form
-3. Add fields using drag-and-drop
-4. Submit test responses
-5. View analytics and charts
+2. Sign up for a new account or sign in
+3. You'll be redirected to the form builder page
+4. Create a form manually or using AI generation
+5. Save your form (you'll be redirected to dashboard)
+6. Share your form link with others
+7. View analytics and charts for responses
 
 ---
 
 ## ✨ Features
 
-- 🚀 **AI-Powered Form Generation**: Generate form fields using natural language descriptions via Claude API
+- 🔐 **User Authentication**: Secure sign up and sign in with JWT-based authentication
+- 🚀 **AI-Powered Form Generation**: Generate form fields using natural language descriptions via Claude API or Gemini API
 - 🖥️ **Drag-and-Drop Interface**: Intuitive form builder with drag-and-drop field reordering
 - 📊 **Interactive Analytics Dashboard**: Visualize form responses with pie charts, bar charts, and statistics
 - 🔄 **Real-time Updates**: See changes as you build your form
 - 📱 **Responsive Design**: Works seamlessly on desktop and mobile devices
 - 📤 **CSV Export**: Export response data for further analysis
 - ✅ **Form Validation**: Built-in validation for required fields
+- 🔗 **Form Sharing**: Share forms via direct links with social media integration
 - 🎨 **Modern UI**: Beautiful, intuitive interface built with Tailwind CSS
+- 🛡️ **Protected Routes**: Secure access to user-specific forms and data
 
 ---
 
@@ -39,7 +44,10 @@ A full-stack MERN application that allows users to create, manage, and analyze s
 - **Express.js** - Web framework
 - **MongoDB** - Database (MongoDB Atlas)
 - **Mongoose** - ODM for MongoDB
+- **JWT (jsonwebtoken)** - Authentication tokens
+- **bcryptjs** - Password hashing
 - **Claude API** - AI form generation (Anthropic)
+- **Gemini API** - Alternative AI form generation (Google)
 
 ### Frontend
 - **React** - UI library
@@ -58,6 +66,7 @@ A full-stack MERN application that allows users to create, manage, and analyze s
 - npm or yarn
 - MongoDB Atlas account (free tier available)
 - Claude API key (optional - for AI features)
+- Gemini API key (optional - alternative to Claude API)
 
 ---
 
@@ -86,14 +95,15 @@ cd MERN_ROLE
    ```env
    PORT=5000
    MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form?retryWrites=true&w=majority
+   JWT_SECRET=your_jwt_secret_key_change_in_production
    CLAUDE_API_KEY=your_claude_api_key_here
-   GROK_API_KEY=your_grok_api_key_here
+   GEMINI_API_KEY=your_gemini_api_key_here
    NODE_ENV=development
    ```
    
-   **⚠️ Security Note:** Never commit your `.env` file or expose real credentials. Replace `YOUR_USERNAME`, `YOUR_PASSWORD`, and `YOUR_CLUSTER` with your actual MongoDB Atlas credentials.
+   **⚠️ Security Note:** Never commit your `.env` file or expose real credentials. Replace `YOUR_USERNAME`, `YOUR_PASSWORD`, and `YOUR_CLUSTER` with your actual MongoDB Atlas credentials. Use a strong, random string for `JWT_SECRET` in production.
    
-   **📝 Note:** `GROK_API_KEY` is optional and only for testing. Claude API is the default. You can remove Grok API support later if needed.
+   **📝 Note:** `GEMINI_API_KEY` is optional. Claude API is the default. You can use Gemini API as an alternative by selecting it in the form builder.
 
 4. Start the backend server:
    ```bash
@@ -128,9 +138,24 @@ cd MERN_ROLE
 
 ## 📖 Usage Guide
 
+### User Flow
+
+1. **Sign Up / Sign In**: Create an account or sign in to access the application
+2. **Form Builder**: After signing in, you'll be redirected to the form building page
+3. **Create Form**: Build your form manually or use AI generation
+4. **Save Form**: After saving, you'll be redirected to your dashboard
+5. **Manage Forms**: View, edit, delete, or share forms from the dashboard
+6. **View Analytics**: Analyze form responses with visual charts and statistics
+
+### Getting Started
+
+1. **Sign Up**: Create a new account with your name, email, and password
+2. **Sign In**: Use your credentials to access the application
+3. You'll be automatically redirected to the form builder page
+
 ### Creating a New Form
 
-1. Click on **"Create New Form"** in the dashboard
+1. After signing in, you'll land on the form builder page
 2. Enter a title and description for your form
 3. Add form fields:
    - **Manually**: Click field types from the sidebar (Text, Textarea, Number, Radio, Checkbox, Select)
@@ -140,7 +165,7 @@ cd MERN_ROLE
    - Add options for radio/checkbox/select fields
    - Set fields as required/optional
    - Drag and drop to reorder fields
-5. Click **"Publish Form"** when done
+5. Click **"Publish Form"** when done (you'll be redirected to dashboard)
 
 ### Generating Forms with AI
 
@@ -171,6 +196,26 @@ cd MERN_ROLE
    - Percentage breakdowns
 4. Export data as CSV for further analysis
 
+### Sharing Forms
+
+1. From the dashboard, click the **Share** icon on any form
+2. Copy the form link or share via:
+   - Copy link to clipboard
+   - WhatsApp
+   - Facebook
+   - Twitter
+   - LinkedIn
+   - Email
+3. Anyone with the link can view and submit responses
+
+### User Authentication
+
+- **Sign Up**: Create a new account with name, email, and password
+- **Sign In**: Access your account with email and password
+- **Protected Routes**: Forms, dashboard, and analytics require authentication
+- **Public Forms**: Form viewing and submission is public (no login required)
+- **Session Management**: Tokens persist for 7 days, auto-logout on expiry
+
 ---
 
 ## 📁 Project Structure
@@ -180,9 +225,11 @@ MERN_ROLE/
 ├── backend/                    # Backend server
 │   ├── models/                # MongoDB models
 │   │   ├── Form.js           # Form schema
-│   │   └── Response.js       # Response schema
+│   │   ├── Response.js       # Response schema
+│   │   └── User.js           # User schema (authentication)
 │   ├── routes/                # API routes
-│   │   └── api.js           # All API endpoints
+│   │   ├── api.js           # Form and AI endpoints (protected)
+│   │   └── auth.js          # Authentication endpoints
 │   ├── server.js             # Express server setup
 │   ├── package.json         # Backend dependencies
 │   └── render.yaml          # Render deployment config
@@ -191,10 +238,16 @@ MERN_ROLE/
 │   ├── public/              # Static assets
 │   ├── src/
 │   │   ├── components/      # React components
-│   │   │   ├── Dashboard.jsx
-│   │   │   ├── FormBuilder.jsx
-│   │   │   ├── FormRenderer.jsx
-│   │   │   └── Analytics.jsx
+│   │   │   ├── Dashboard.jsx      # User dashboard
+│   │   │   ├── FormBuilder.jsx    # Form creation/editing
+│   │   │   ├── FormRenderer.jsx   # Public form view
+│   │   │   ├── Analytics.jsx      # Form analytics
+│   │   │   ├── SignIn.jsx         # Sign in page
+│   │   │   ├── SignUp.jsx         # Sign up page
+│   │   │   ├── ProtectedRoute.jsx # Route protection
+│   │   │   └── ShareModal.jsx     # Form sharing modal
+│   │   ├── contexts/        # React contexts
+│   │   │   └── AuthContext.jsx   # Authentication context
 │   │   ├── config/          # Configuration files
 │   │   │   └── api.js      # API endpoints configuration
 │   │   ├── App.jsx          # Main App component
@@ -210,23 +263,32 @@ MERN_ROLE/
 
 ## 🔌 API Endpoints
 
+### Authentication (Public)
+
+- `POST /api/v1/auth/signup` - Register a new user
+- `POST /api/v1/auth/signin` - Sign in existing user
+- `GET /api/v1/auth/me` - Get current user info (requires authentication)
+
 ### Forms
 
-- `GET /api/v1/forms` - Get all forms
-- `GET /api/v1/forms/:id` - Get a specific form
-- `POST /api/v1/forms` - Create a new form
-- `PUT /api/v1/forms/:id` - Update a form
-- `DELETE /api/v1/forms/:id` - Delete a form
+- `GET /api/v1/forms` - Get all forms for authenticated user (🔒 Protected)
+- `GET /api/v1/forms/:id` - Get a specific form (Public - for form viewing/submission)
+- `POST /api/v1/forms` - Create a new form (🔒 Protected)
+- `PUT /api/v1/forms/:id` - Update a form (🔒 Protected)
+- `DELETE /api/v1/forms/:id` - Delete a form (🔒 Protected)
 
 ### Responses
 
-- `POST /api/v1/forms/:id/response` - Submit a new response
-- `GET /api/v1/forms/:id/analytics` - Get analytics for a form (includes all responses)
+- `POST /api/v1/forms/:id/response` - Submit a new response (Public)
+- `GET /api/v1/forms/:id/analytics` - Get analytics for a form (🔒 Protected)
 
 ### AI Generation
 
-- `POST /api/v1/ai/generate` - Generate form fields using AI (simple prompt)
-- `POST /api/v1/ai/generate-form` - Generate complete form using AI (topic, description, numQuestions)
+- `POST /api/v1/ai/generate` - Generate form fields using Claude API (🔒 Protected)
+- `POST /api/v1/ai/generate-gemini` - Generate form fields using Gemini API (🔒 Protected)
+- `POST /api/v1/ai/generate-form` - Generate complete form using AI (🔒 Protected)
+
+**Legend:** 🔒 Protected = Requires JWT authentication token in header
 
 ---
 
@@ -259,7 +321,9 @@ MERN_ROLE/
 5. Add Environment Variables:
    ```
    MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form
+   JWT_SECRET=your_strong_random_secret_key_here
    CLAUDE_API_KEY=your_claude_api_key
+   GEMINI_API_KEY=your_gemini_api_key (optional)
    NODE_ENV=production
    PORT=10000
    ```
@@ -300,12 +364,18 @@ MERN_ROLE/
 ```env
 PORT=5000
 MONGODB_URI=mongodb+srv://YOUR_USERNAME:YOUR_PASSWORD@YOUR_CLUSTER.mongodb.net/ai-generated-form?retryWrites=true&w=majority
+JWT_SECRET=your_jwt_secret_key_change_in_production
 CLAUDE_API_KEY=your_claude_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 ```
 
-**⚠️ Important:** Replace all placeholder values with your actual credentials. Never commit this file to version control.
+**⚠️ Important:** 
+- Replace all placeholder values with your actual credentials
+- `JWT_SECRET` should be a strong, random string (use a generator in production)
+- `GEMINI_API_KEY` is optional - app works with just Claude API
+- Never commit this file to version control
 
 ### Frontend (.env)
 
@@ -328,21 +398,38 @@ VITE_API_URL=http://localhost:5000
 
 ## 🎯 Key Features Explained
 
+### User Flow
+1. **Sign In/Sign Up** → Redirects to Form Builder (`/create`)
+2. **Create/Edit Form** → Build forms with manual or AI generation
+3. **Save Form** → Redirects to Dashboard (`/`)
+4. **Manage Forms** → View, edit, delete, share, or analyze forms from dashboard
+
 ### Drag-and-Drop Form Builder
 - Reorder fields by dragging the grip handle
 - Visual feedback during dragging
 - Keyboard navigation support
+- Real-time preview of form structure
 
 ### AI Form Generation
+- Support for both Claude API and Gemini API
+- Toggle between AI providers in the form builder
 - Describe your form in natural language
 - AI suggests appropriate field types and questions
 - Customize generated fields as needed
 
 ### Analytics Dashboard
-- Visual charts (Pie and Bar charts)
+- Visual charts (Pie and Bar charts using Chart.js)
 - Response statistics and summaries
-- Per-question analytics
+- Per-question analytics with expandable sections
 - CSV export functionality
+- Completion rate calculations
+
+### Form Sharing
+- Generate shareable links for forms
+- Share via social media (WhatsApp, Facebook, Twitter, LinkedIn)
+- Copy link to clipboard
+- Email sharing option
+- Public form viewing (no authentication required for submissions)
 
 ---
 
@@ -355,10 +442,17 @@ VITE_API_URL=http://localhost:5000
 - Check IP whitelist in MongoDB Atlas (allow 0.0.0.0/0 for all IPs)
 - Ensure database user credentials are correct
 
-**Claude API Errors:**
-- Verify API key is correct
+**Authentication Errors:**
+- Verify JWT_SECRET is set in environment variables
+- Check if token is being sent in Authorization header
+- Ensure token hasn't expired (default: 7 days)
+- Clear localStorage and sign in again if token is invalid
+
+**Claude/Gemini API Errors:**
+- Verify API key is correct in environment variables
 - Check if you have sufficient credits
-- API key is optional - app works without it (AI features disabled)
+- API keys are optional - app works without them (AI features disabled)
+- For Gemini API errors, ensure GEMINI_API_KEY is set if using Gemini provider
 
 ### Frontend Issues
 
@@ -406,9 +500,11 @@ This project is licensed under the MIT License.
 ## 🙏 Acknowledgments
 
 - [Anthropic](https://www.anthropic.com/) for the Claude API
+- [Google](https://ai.google.dev/) for the Gemini API
 - [MongoDB](https://www.mongodb.com/) for the database
 - [React](https://reactjs.org/) and [Express](https://expressjs.com/) for the web frameworks
 - [Chart.js](https://www.chartjs.org/) for data visualization
+- [DnD Kit](https://dndkit.com/) for drag-and-drop functionality
 - [Render](https://render.com/) for hosting
 
 ---

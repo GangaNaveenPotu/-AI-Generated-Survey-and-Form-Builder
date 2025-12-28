@@ -3,6 +3,7 @@ const router = express.Router();
 const Form = require('../models/Form');
 const Response = require('../models/Response');
 const Anthropic = require('@anthropic-ai/sdk');
+const { auth } = require('./auth');
 
 // Initialize Anthropic Client
 const anthropic = new Anthropic({
@@ -11,11 +12,18 @@ const anthropic = new Anthropic({
 
 // --- FORM ROUTES ---
 
-// Create a new form
-router.post('/forms', async (req, res) => {
+// Create a new form (protected)
+router.post('/forms', auth, async (req, res) => {
     try {
         const { title, description, fields } = req.body;
-        const newForm = new Form({ title, description, fields });
+        
+        const newForm = new Form({ 
+            title, 
+            description, 
+            fields,
+            user: req.user._id // Associate form with the logged-in user
+        });
+        
         await newForm.save();
         res.status(201).json(newForm);
     } catch (err) {
@@ -23,20 +31,21 @@ router.post('/forms', async (req, res) => {
     }
 });
 
-// Get all forms (for dashboard)
-router.get('/forms', async (req, res) => {
+// Get all forms for the authenticated user (protected)
+router.get('/forms', auth, async (req, res) => {
     try {
-        const forms = await Form.find().sort({ createdAt: -1 });
+        // Only return forms created by the authenticated user
+        const forms = await Form.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.json(forms);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Get a form by ID
+// Get a form by ID (public - for viewing/submitting forms)
 router.get('/forms/:id', async (req, res) => {
     try {
-        const form = await Form.findById(req.params.id);
+        const form = await Form.findOne({ _id: req.params.id });
         if (!form) return res.status(404).json({ error: 'Form not found' });
         res.json(form);
     } catch (err) {
@@ -44,30 +53,46 @@ router.get('/forms/:id', async (req, res) => {
     }
 });
 
-// Update a form
-router.put('/forms/:id', async (req, res) => {
+// Update a form (only if owned by the user) (protected)
+router.put('/forms/:id', auth, async (req, res) => {
     try {
         const { title, description, fields } = req.body;
-        const updatedForm = await Form.findByIdAndUpdate(
-            req.params.id,
-            { title, description, fields },
+        
+        const updatedForm = await Form.findOneAndUpdate(
+            { 
+                _id: req.params.id,
+                user: req.user._id // Only allow update if user owns the form
+            },
+            { $set: { title, description, fields } },
             { new: true }
         );
-        if (!updatedForm) return res.status(404).json({ error: 'Form not found' });
+        
+        if (!updatedForm) {
+            return res.status(404).json({ error: 'Form not found or access denied' });
+        }
+        
         res.json(updatedForm);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Delete a form
-router.delete('/forms/:id', async (req, res) => {
+// Delete a form (only if owned by the user) (protected)
+router.delete('/forms/:id', auth, async (req, res) => {
     try {
-        const form = await Form.findByIdAndDelete(req.params.id);
-        if (!form) return res.status(404).json({ error: 'Form not found' });
-        // Also delete associated responses
+        const deletedForm = await Form.findOneAndDelete({
+            _id: req.params.id,
+            user: req.user._id // Only allow delete if user owns the form
+        });
+        
+        if (!deletedForm) {
+            return res.status(404).json({ error: 'Form not found or access denied' });
+        }
+        
+        // Also delete all responses associated with this form
         await Response.deleteMany({ formId: req.params.id });
-        res.json({ message: 'Form and associated responses deleted' });
+        
+        res.json({ message: 'Form deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -90,8 +115,8 @@ router.post('/forms/:id/response', async (req, res) => {
     }
 });
 
-// Get analytics (basic count for now)
-router.get('/forms/:id/analytics', async (req, res) => {
+// Get analytics (basic count for now) (protected)
+router.get('/forms/:id/analytics', auth, async (req, res) => {
     try {
         const responses = await Response.find({ formId: req.params.id });
         res.json({
@@ -105,8 +130,8 @@ router.get('/forms/:id/analytics', async (req, res) => {
 
 // --- AI ROUTES ---
 
-// Generate form fields using Claude API only (no fallback)
-router.post('/ai/generate', async (req, res) => {
+// Generate form fields using Claude API only (no fallback) (protected)
+router.post('/ai/generate', auth, async (req, res) => {
     try {
         const { prompt } = req.body;
         
@@ -162,14 +187,14 @@ router.post('/ai/generate', async (req, res) => {
                 return res.status(503).json({ 
                     error: 'Claude API request failed', 
                     message: errorMessage || 'Invalid request to Claude API. Please check your API key and credits.',
-                    details: 'If you have low credits, you can try using Grok API instead by selecting it in the form builder.'
+                    details: 'If you have low credits, you can try using Gemini API instead by selecting it in the form builder.'
                 });
             }
             
             res.status(500).json({ 
                 error: 'Failed to generate form with Claude', 
                 details: errorMessage,
-                message: 'An error occurred while generating the form with Claude API. Please try again or use Grok API instead.'
+                message: 'An error occurred while generating the form with Claude API. Please try again or use Gemini API instead.'
             });
         }
     } catch (outerErr) {
@@ -183,36 +208,35 @@ router.post('/ai/generate', async (req, res) => {
     }
 });
 
-// Helper function to call Grok API (standalone, no fallback)
-async function tryGrokAPI(prompt, res) {
-    if (!process.env.GROK_API_KEY) {
-        console.error("Grok API Key not found in environment variables");
+// Helper function to call Gemini API (standalone, no fallback)
+async function tryGeminiAPI(prompt, res) {
+    if (!process.env.GEMINI_API_KEY) {
+        console.error("Gemini API Key not found in environment variables");
         return res.status(503).json({ 
-            error: 'Grok API Key missing',
-            message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
-            details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
+            error: 'Gemini API Key missing',
+            message: 'Gemini API key is not configured. Please set GEMINI_API_KEY in your Render environment variables or .env file.',
+            details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GEMINI_API_KEY variable'
         });
     }
 
     try {
-        // Try different model names in order
-        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
+        // Try different Gemini model names in order (using available models from API key)
+        // Based on available models: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash, gemini-flash-latest, gemini-pro-latest
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
         let lastError = null;
         
         for (const model of models) {
             try {
-                console.log(`Trying Grok model: ${model}`);
-                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+                console.log(`Trying Gemini model: ${model}`);
+                const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: model,
-                        messages: [{
-                            role: 'user',
-                            content: `Generate a list of form fields for a form about: "${prompt}". 
+                        contents: [{
+                            parts: [{
+                                text: `Generate a list of form fields for a form about: "${prompt}". 
                             Return ONLY a JSON array of objects. Each object should have:
                             - id: string (unique)
                             - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
@@ -221,30 +245,40 @@ async function tryGrokAPI(prompt, res) {
                             - options: array of strings (only for radio/checkbox/select)
                             - required: boolean
                             Do not include any markdown formatting or explanation.`
+                            }]
                         }],
-                        max_tokens: 1024,
-                        temperature: 0.7
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 1024
+                        }
                     })
                 });
 
-                if (!grokResponse.ok) {
-                    const errorData = await grokResponse.json().catch(() => ({}));
-                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
-                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+                if (!geminiResponse.ok) {
+                    const errorData = await geminiResponse.json().catch(() => ({}));
+                    console.error(`Gemini API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
+                    lastError = errorData.error?.message || errorData.message || `Gemini API error: ${geminiResponse.status}`;
+                    
+                    // Check if it's an invalid API key error - don't try other models
+                    const errorMessage = (errorData.error?.message || errorData.message || '').toLowerCase();
+                    if (errorMessage.includes('api key') || errorMessage.includes('invalid') || errorMessage.includes('permission denied')) {
+                        throw new Error(`Invalid Gemini API key: ${errorData.error?.message || errorData.message || 'Invalid API key'}`);
+                    }
+                    
                     // If it's a model not found error, try next model
-                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
+                    if (geminiResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('not found'))) {
                         console.log(`Model ${model} not available, trying next...`);
                         continue;
                     }
                     throw new Error(lastError);
                 }
 
-                const data = await grokResponse.json();
-                const textResponse = data.choices[0]?.message?.content || '';
+                const data = await geminiResponse.json();
+                const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 
                 if (!textResponse) {
-                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
-                    throw new Error('Grok API returned empty response');
+                    console.error("Gemini API returned empty response:", JSON.stringify(data, null, 2));
+                    throw new Error('Gemini API returned empty response');
                 }
                 
                 // Parse the JSON from the content
@@ -253,14 +287,14 @@ async function tryGrokAPI(prompt, res) {
                 try {
                     fields = JSON.parse(jsonBlock);
                 } catch (parseErr) {
-                    console.error("Failed to parse Grok response as JSON:", parseErr);
+                    console.error("Failed to parse Gemini response as JSON:", parseErr);
                     console.error("Raw response:", textResponse);
-                    throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
+                    throw new Error(`Failed to parse Gemini API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
                 }
 
                 return res.json({ 
                     fields, 
-                    provider: 'grok'
+                    provider: 'gemini'
                 });
             } catch (modelErr) {
                 lastError = modelErr.message;
@@ -274,27 +308,38 @@ async function tryGrokAPI(prompt, res) {
         }
         
         // If all models failed
-        throw new Error(lastError || 'All Grok models failed');
+        throw new Error(lastError || 'All Gemini models failed');
     } catch (err) {
-        console.error("Grok API Error:", err);
+        console.error("Gemini API Error:", err);
         
-        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+        const errorMessage = err.message?.toLowerCase() || '';
+        
+        // Check for invalid API key errors
+        if (errorMessage.includes('invalid api key') || errorMessage.includes('invalid gemini api key') || errorMessage.includes('permission denied')) {
             return res.status(503).json({ 
-                error: 'Grok API authentication failed', 
-                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
+                error: 'Invalid Gemini API Key', 
+                message: 'The Gemini API key is incorrect or expired. Please get a new API key from https://aistudio.google.com/app/apikey',
+                details: '1. Visit https://aistudio.google.com/app/apikey\n2. Sign in to your Google account\n3. Create a new API key\n4. Update GEMINI_API_KEY in your .env file or Render environment variables'
+            });
+        }
+        
+        if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+            return res.status(503).json({ 
+                error: 'Gemini API authentication failed', 
+                message: 'Invalid or missing Gemini API key. Please check your GEMINI_API_KEY in the .env file.'
             });
         }
         
         return res.status(500).json({ 
-            error: 'Failed to generate form with Grok', 
+            error: 'Failed to generate form with Gemini', 
             details: err.message,
-            message: 'An error occurred while generating the form with Grok API. Please try again.'
+            message: 'An error occurred while generating the form with Gemini API. Please try again.'
         });
     }
 }
 
-// AI-Generated Form Suggestion (Claude API only - no fallback)
-router.post('/ai/generate-form', async (req, res) => {
+// AI-Generated Form Suggestion (Claude API only - no fallback) (protected)
+router.post('/ai/generate-form', auth, async (req, res) => {
     try {
         const { topic, description, numQuestions = 5 } = req.body;
         
@@ -381,14 +426,14 @@ router.post('/ai/generate-form', async (req, res) => {
                 return res.status(503).json({ 
                     error: 'Claude API request failed', 
                     message: errorMessage || 'Invalid request to Claude API. Please check your API key and credits.',
-                    details: 'If you have low credits, you can try using Grok API instead by selecting it in the form builder.'
+                    details: 'If you have low credits, you can try using Gemini API instead by selecting it in the form builder.'
                 });
             }
             
             res.status(500).json({ 
                 error: 'Failed to generate form with Claude', 
                 details: errorMessage,
-                message: 'An error occurred while generating the form with Claude API. Please try again or use Grok API instead.'
+                message: 'An error occurred while generating the form with Claude API. Please try again or use Gemini API instead.'
             });
         }
     } catch (error) {
@@ -401,12 +446,12 @@ router.post('/ai/generate-form', async (req, res) => {
     }
 });
 
-// Helper function to call Grok API for generate-form endpoint
-async function tryGrokAPIForForm(topic, description, numQuestions, res) {
-    if (!process.env.GROK_API_KEY) {
+// Helper function to call Gemini API for generate-form endpoint
+async function tryGeminiAPIForForm(topic, description, numQuestions, res) {
+    if (!process.env.GEMINI_API_KEY) {
         return res.status(503).json({ 
-            error: 'Grok API Key missing',
-            message: 'Grok API key is not configured. Please set GROK_API_KEY in your .env file.'
+            error: 'Gemini API Key missing',
+            message: 'Gemini API key is not configured. Please set GEMINI_API_KEY in your .env file.'
         });
     }
 
@@ -435,48 +480,57 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res) {
         
         Only return the JSON array, no other text.`;
 
-        // Try different model names in order
-        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
+        // Try different Gemini model names in order (using available models from API key)
+        // Based on available models: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash, gemini-flash-latest, gemini-pro-latest
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
         let lastError = null;
         
         for (const model of models) {
             try {
-                console.log(`Trying Grok model: ${model}`);
-                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+                console.log(`Trying Gemini model: ${model}`);
+                const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        model: model,
-                        messages: [{
-                            role: 'user',
-                            content: prompt
+                        contents: [{
+                            parts: [{
+                                text: prompt
+                            }]
                         }],
-                        max_tokens: 4000,
-                        temperature: 0.7
+                        generationConfig: {
+                            temperature: 0.7,
+                            maxOutputTokens: 4000
+                        }
                     })
                 });
 
-                if (!grokResponse.ok) {
-                    const errorData = await grokResponse.json().catch(() => ({}));
-                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
-                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
+                if (!geminiResponse.ok) {
+                    const errorData = await geminiResponse.json().catch(() => ({}));
+                    console.error(`Gemini API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
+                    lastError = errorData.error?.message || errorData.message || `Gemini API error: ${geminiResponse.status}`;
+                    
+                    // Check if it's an invalid API key error - don't try other models
+                    const errorMessage = (errorData.error?.message || errorData.message || '').toLowerCase();
+                    if (errorMessage.includes('api key') || errorMessage.includes('invalid') || errorMessage.includes('permission denied')) {
+                        throw new Error(`Invalid Gemini API key: ${errorData.error?.message || errorData.message || 'Invalid API key'}`);
+                    }
+                    
                     // If it's a model not found error, try next model
-                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
+                    if (geminiResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('not found'))) {
                         console.log(`Model ${model} not available, trying next...`);
                         continue;
                     }
                     throw new Error(lastError);
                 }
 
-                const data = await grokResponse.json();
-                const content = data.choices[0]?.message?.content || '';
+                const data = await geminiResponse.json();
+                const content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
                 
                 if (!content) {
-                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
-                    throw new Error('Grok API returned empty response');
+                    console.error("Gemini API returned empty response:", JSON.stringify(data, null, 2));
+                    throw new Error('Gemini API returned empty response');
                 }
                 
                 let fields = [];
@@ -487,15 +541,15 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res) {
                     const jsonBlock = jsonToParse.replace(/```json\n?|\n?```/g, '').trim();
                     fields = JSON.parse(jsonBlock);
                 } catch (error) {
-                    console.error('Error parsing Grok response:', error);
+                    console.error('Error parsing Gemini response:', error);
                     console.error('Raw response:', content);
-                    throw new Error(`Failed to parse Grok AI response: ${error.message}`);
+                    throw new Error(`Failed to parse Gemini AI response: ${error.message}`);
                 }
 
                 return res.json({ 
                     success: true, 
                     fields, 
-                    provider: 'grok'
+                    provider: 'gemini'
                 });
             } catch (modelErr) {
                 lastError = modelErr.message;
@@ -509,27 +563,39 @@ async function tryGrokAPIForForm(topic, description, numQuestions, res) {
         }
         
         // If all models failed
-        throw new Error(lastError || 'All Grok models failed');
+        throw new Error(lastError || 'All Gemini models failed');
     } catch (err) {
-        console.error("Grok API Error:", err);
+        console.error("Gemini API Error:", err);
         
-        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+        const errorMessage = err.message?.toLowerCase() || '';
+        
+        // Check for invalid API key errors
+        if (errorMessage.includes('invalid api key') || errorMessage.includes('invalid gemini api key') || errorMessage.includes('permission denied')) {
             return res.status(503).json({ 
-                error: 'Grok API authentication failed', 
-                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
+                error: 'Invalid Gemini API Key', 
+                message: 'The Gemini API key is incorrect or expired. Please get a new API key from https://aistudio.google.com/app/apikey',
+                details: '1. Visit https://aistudio.google.com/app/apikey\n2. Sign in to your Google account\n3. Create a new API key\n4. Update GEMINI_API_KEY in your .env file or Render environment variables'
+            });
+        }
+        
+        if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+            return res.status(503).json({ 
+                error: 'Gemini API authentication failed', 
+                message: 'Invalid or missing Gemini API key. Please check your GEMINI_API_KEY in the .env file.'
             });
         }
         
         return res.status(500).json({ 
-            error: 'Failed to generate form with Grok', 
+            error: 'Failed to generate form with Gemini', 
             details: err.message,
-            message: 'An error occurred while generating the form with Grok API. Please try again.'
+            message: 'An error occurred while generating the form with Gemini API. Please try again.'
         });
     }
 }
 
-// Generate form fields using Grok API (testing - separate endpoint)
-router.post('/ai/generate-grok', async (req, res) => {
+// Generate form fields using Gemini API (testing - separate endpoint)
+// Generate form fields using Gemini API (protected)
+router.post('/ai/generate-gemini', auth, async (req, res) => {
     try {
         const { prompt } = req.body;
         
@@ -540,120 +606,19 @@ router.post('/ai/generate-grok', async (req, res) => {
             });
         }
         
-        if (!process.env.GROK_API_KEY) {
-            console.error("GROK_API_KEY is not set in environment variables");
+        if (!process.env.GEMINI_API_KEY) {
+            console.error("GEMINI_API_KEY is not set in environment variables");
             return res.status(503).json({ 
-                error: 'Grok API Key missing',
-                message: 'Grok API key is not configured. Please set GROK_API_KEY in your Render environment variables or .env file.',
-                details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GROK_API_KEY variable'
+                error: 'Gemini API Key missing',
+                message: 'Gemini API key is not configured. Please set GEMINI_API_KEY in your Render environment variables or .env file.',
+                details: 'Go to Render Dashboard → Your Backend Service → Environment → Add GEMINI_API_KEY variable'
             });
         }
 
-        try {
-        // Try different model names in order
-        const models = ['grok-2-1212', 'grok-beta', 'grok-2'];
-        let lastError = null;
-        
-        for (const model of models) {
-            try {
-                console.log(`Trying Grok model: ${model}`);
-                const grokResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${process.env.GROK_API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: model,
-                        messages: [{
-                            role: 'user',
-                            content: `Generate a list of form fields for a form about: "${prompt}". 
-                            Return ONLY a JSON array of objects. Each object should have:
-                            - id: string (unique)
-                            - type: "text" | "textarea" | "number" | "radio" | "checkbox" | "select"
-                            - label: string
-                            - placeholder: string (optional)
-                            - options: array of strings (only for radio/checkbox/select)
-                            - required: boolean
-                            Do not include any markdown formatting or explanation.`
-                        }],
-                        max_tokens: 1024,
-                        temperature: 0.7
-                    })
-                });
-
-                if (!grokResponse.ok) {
-                    const errorData = await grokResponse.json().catch(() => ({}));
-                    console.error(`Grok API Error with model ${model}:`, JSON.stringify(errorData, null, 2));
-                    lastError = errorData.error?.message || errorData.message || `Grok API error: ${grokResponse.status}`;
-                    // If it's a model not found error, try next model
-                    if (grokResponse.status === 400 && (errorData.error?.message?.includes('model') || errorData.error?.message?.includes('invalid'))) {
-                        console.log(`Model ${model} not available, trying next...`);
-                        continue;
-                    }
-                    throw new Error(lastError);
-                }
-
-                const data = await grokResponse.json();
-                const textResponse = data.choices[0]?.message?.content || '';
-                
-                if (!textResponse) {
-                    console.error("Grok API returned empty response:", JSON.stringify(data, null, 2));
-                    throw new Error('Grok API returned empty response');
-                }
-                
-                // Parse the JSON from the content
-                const jsonBlock = textResponse.replace(/```json\n?|\n?```/g, '').trim();
-                let fields;
-                try {
-                    fields = JSON.parse(jsonBlock);
-                } catch (parseErr) {
-                    console.error("Failed to parse Grok response as JSON:", parseErr);
-                    console.error("Raw response:", textResponse);
-                    throw new Error(`Failed to parse Grok API response: ${parseErr.message}. Raw response: ${textResponse.substring(0, 200)}`);
-                }
-
-                return res.json({ fields, provider: 'grok' });
-            } catch (modelErr) {
-                lastError = modelErr.message;
-                // If this is the last model, throw the error
-                if (model === models[models.length - 1]) {
-                    throw modelErr;
-                }
-                // Otherwise, continue to next model
-                console.log(`Model ${model} failed, trying next...`);
-            }
-        }
-        
-        // If all models failed
-        throw new Error(lastError || 'All Grok models failed');
-    } catch (err) {
-        console.error("Grok API Error:", err);
-        console.error("Error stack:", err.stack);
-            
-        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
-            return res.status(503).json({ 
-                error: 'Grok API authentication failed', 
-                message: 'Invalid or missing Grok API key. Please check your GROK_API_KEY in the .env file.'
-            });
-        }
-        
-        if (err.message?.includes('429') || err.message?.includes('rate limit')) {
-            return res.status(503).json({ 
-                error: 'Grok API rate limit exceeded', 
-                message: 'Too many requests. Please try again later.'
-            });
-        }
-        
-        return res.status(500).json({ 
-            error: 'Failed to generate form with Grok', 
-            details: err.message,
-            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
-            message: 'An error occurred while generating the form with Grok API. Please try again or use Claude API.'
-        });
-    }
+        // Use the helper function
+        return await tryGeminiAPI(prompt, res);
     } catch (outerErr) {
-        console.error("Unexpected error in /ai/generate-grok endpoint:", outerErr);
+        console.error("Unexpected error in /ai/generate-gemini endpoint:", outerErr);
         console.error("Error stack:", outerErr.stack);
         return res.status(500).json({ 
             error: 'Unexpected server error', 
@@ -664,43 +629,118 @@ router.post('/ai/generate-grok', async (req, res) => {
     }
 });
 
-// Test Grok API connection
-router.get('/ai/test-grok', async (req, res) => {
+// Test Gemini API connection
+router.get('/ai/test-gemini', async (req, res) => {
     try {
-        if (!process.env.GROK_API_KEY) {
+        if (!process.env.GEMINI_API_KEY) {
             return res.status(503).json({ 
-                error: 'Grok API Key missing',
-                message: 'GROK_API_KEY is not configured.'
+                error: 'Gemini API Key missing',
+                message: 'GEMINI_API_KEY is not configured.'
             });
         }
 
-        // Try a simple API call to test the connection
-        const testResponse = await fetch('https://api.x.ai/v1/models', {
+        // First, try to list available models to see what's accessible
+        const modelsListResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${process.env.GEMINI_API_KEY}`, {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${process.env.GROK_API_KEY}`
+                'Content-Type': 'application/json'
             }
         });
 
-        if (!testResponse.ok) {
+        let availableModels = [];
+        if (modelsListResponse.ok) {
+            const modelsData = await modelsListResponse.json();
+            availableModels = modelsData.models?.map(m => m.name?.replace('models/', '') || m.name) || [];
+        }
+
+        // Try a simple generation with available models (based on API key access)
+        const modelNames = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-flash-latest', 'gemini-pro-latest'];
+        let testResponse = null;
+        let workingModel = null;
+        let lastError = null;
+
+        for (const modelName of modelNames) {
+            try {
+                testResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${process.env.GEMINI_API_KEY}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: "Say hello"
+                            }]
+                        }],
+                        generationConfig: {
+                            maxOutputTokens: 10
+                        }
+                    })
+                });
+
+                if (testResponse.ok) {
+                    workingModel = modelName;
+                    break;
+                } else {
+                    const errorData = await testResponse.json().catch(() => ({}));
+                    lastError = errorData.error?.message || `Status ${testResponse.status}`;
+                    if (testResponse.status === 404) {
+                        continue; // Try next model
+                    } else {
+                        break; // Different error, stop trying
+                    }
+                }
+            } catch (err) {
+                lastError = err.message;
+                continue;
+            }
+        }
+
+        if (!testResponse || !testResponse.ok) {
+
             const errorData = await testResponse.json().catch(() => ({}));
-            return res.status(testResponse.status).json({
-                error: 'Grok API test failed',
-                status: testResponse.status,
-                details: errorData
+            const errorMessage = errorData.error?.message || errorData.message || lastError || 'Unknown error';
+            
+            // Check for invalid API key
+            if (errorMessage.toLowerCase().includes('api key') || errorMessage.toLowerCase().includes('invalid') || errorMessage.toLowerCase().includes('permission denied')) {
+                return res.status(503).json({
+                    error: 'Invalid Gemini API Key',
+                    status: testResponse?.status || 500,
+                    message: 'The Gemini API key is incorrect, expired, or revoked.',
+                    details: errorData,
+                    instructions: [
+                        '1. Visit https://aistudio.google.com/app/apikey',
+                        '2. Sign in to your Google account',
+                        '3. Create a new API key',
+                        '4. Copy the complete key',
+                        '5. Update GEMINI_API_KEY in your .env file or Render environment variables',
+                        '6. Restart your server'
+                    ]
+                });
+            }
+            
+            return res.status(testResponse?.status || 500).json({
+                error: 'Gemini API test failed',
+                status: testResponse?.status || 500,
+                details: errorData,
+                message: errorMessage,
+                availableModels: availableModels.length > 0 ? availableModels : 'Could not fetch model list',
+                triedModels: modelNames
             });
         }
 
-        const models = await testResponse.json();
+        const responseData = await testResponse.json();
         return res.json({
             success: true,
-            message: 'Grok API connection successful',
-            availableModels: models.data?.map(m => m.id) || []
+            message: 'Gemini API connection successful',
+            workingModel: workingModel,
+            availableModels: availableModels.length > 0 ? availableModels : ['Could not fetch model list'],
+            testResponse: responseData.candidates?.[0]?.content?.parts?.[0]?.text || 'Connection successful'
         });
     } catch (err) {
-        console.error("Grok API test error:", err);
+        console.error("Gemini API test error:", err);
         return res.status(500).json({
-            error: 'Grok API test failed',
+            error: 'Gemini API test failed',
             details: err.message
         });
     }

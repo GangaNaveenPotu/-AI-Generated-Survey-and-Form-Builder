@@ -37,7 +37,11 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ai-form-b
 
 // Routes
 const apiRoutes = require('./routes/api');
+const { router: authRouter } = require('./routes/auth');
+
+// Use routes
 app.use('/api/v1', apiRoutes);
+app.use('/api/v1/auth', authRouter);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

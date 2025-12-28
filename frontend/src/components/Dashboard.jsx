@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BarChart3, FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2, Share2 } from 'lucide-react';
 import API_ENDPOINTS from '../config/api';
 import ShareModal from './ShareModal';
+import { useAuth } from '../contexts/AuthContext';
 
 const Dashboard = () => {
     const [forms, setForms] = useState([]);
@@ -11,250 +12,225 @@ const Dashboard = () => {
     const [error, setError] = useState(null);
     const [shareModalOpen, setShareModalOpen] = useState(false);
     const [selectedForm, setSelectedForm] = useState(null);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
-    useEffect(() => {
-        fetchForms();
-    }, []);
+    const fetchForms = useCallback(async () => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
-    const fetchForms = async () => {
         setLoading(true);
         setError(null);
+
         try {
-            console.log('Fetching forms from:', API_ENDPOINTS.FORMS);
-            
-            // Add timeout for API call
-            const res = await axios.get(API_ENDPOINTS.FORMS, {
-                timeout: 30000, // 30 second timeout
+            const token = localStorage.getItem('token');
+            const response = await axios.get(API_ENDPOINTS.FORMS, {
                 headers: {
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 30000
             });
-            
-            // Fetch analytics for each form (with timeout and error handling)
-            const formsWithCounts = await Promise.all(res.data.map(async f => {
-                try {
-                    const ana = await axios.get(API_ENDPOINTS.ANALYTICS(f._id), {
-                        timeout: 10000 // 10 second timeout for analytics
-                    });
-                    return { ...f, responseCount: ana.data.totalResponses || 0 };
-                } catch (err) {
-                    console.warn(`Failed to fetch analytics for form ${f._id}:`, err.message);
-                    return { ...f, responseCount: 0 };
-                }
-            }));
-            
+
+            // Fetch analytics for each form
+            const formsWithCounts = await Promise.all(
+                response.data.map(async (form) => {
+                    try {
+                        const analytics = await axios.get(API_ENDPOINTS.ANALYTICS(form._id), {
+                            headers: { 'Authorization': `Bearer ${token}` },
+                            timeout: 10000
+                        });
+                        return { ...form, responseCount: analytics.data.totalResponses || 0 };
+                    } catch (err) {
+                        console.warn(`Failed to fetch analytics for form ${form._id}:`, err.message);
+                        return { ...form, responseCount: 0 };
+                    }
+                })
+            );
+
             setForms(formsWithCounts);
         } catch (err) {
             console.error('Error fetching forms:', err);
-            const isNetworkError = !err.response;
-            const isTimeout = err.code === 'ECONNABORTED' || err.message?.includes('timeout');
-            const errorMessage = err.response?.data?.error || err.message || 'Failed to load forms';
-            
-            if (isTimeout) {
-                setError(`Request timed out after 30 seconds. This usually means:
-                
-• The backend server is starting up (Render free tier takes ~30 seconds to wake up)
-• The backend URL might be incorrect
-• Network connectivity issues
-
-Current API URL: ${API_ENDPOINTS.BASE}
-
-Please wait 30-60 seconds and click Retry, or check your Vercel environment variables.`);
-            } else if (isNetworkError) {
-                setError(`Unable to connect to backend server.
-
-Current API URL: ${API_ENDPOINTS.BASE}
-
-Possible issues:
-• Backend is not running or URL is incorrect
-• CORS configuration issue
-• Network connectivity problem
-
-Please verify VITE_API_URL in Vercel settings is set to: https://ai-generated-survey-and-form-builder.onrender.com`);
-            } else if (err.response?.status === 404) {
-                setError(`Backend endpoint not found.
-
-Current API URL: ${API_ENDPOINTS.BASE}
-
-Please verify the backend URL in Vercel environment variables.`);
-            } else {
-                setError(`Error loading forms: ${errorMessage}`);
+            if (err.response?.status === 401) {
+                // Token expired or invalid
+                logout();
+                navigate('/signin');
+                return;
             }
+            setError('Failed to load forms. Please try again later.');
         } finally {
             setLoading(false);
         }
-    };
+    }, [user, navigate, logout]);
 
-    const deleteForm = async (id) => {
-        if (!window.confirm('Are you sure you want to delete this form and all its responses?')) return;
+    useEffect(() => {
+        fetchForms();
+    }, [fetchForms]);
+
+    const handleDelete = async (formId) => {
+        if (!window.confirm('Are you sure you want to delete this form? This action cannot be undone.')) {
+            return;
+        }
+
         try {
-            await axios.delete(API_ENDPOINTS.FORM(id));
-            setForms(forms.filter(f => f._id !== id));
+            const token = localStorage.getItem('token');
+            await axios.delete(`${API_ENDPOINTS.FORMS}/${formId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setForms(forms.filter(form => form._id !== formId));
         } catch (err) {
-            console.error(err);
-            alert('Failed to delete form');
+            console.error('Error deleting form:', err);
+            alert('Failed to delete form. Please try again.');
         }
     };
 
-    const openShareModal = (form) => {
-        setSelectedForm(form);
-        setShareModalOpen(true);
-    };
-
-    const closeShareModal = () => {
-        setShareModalOpen(false);
-        setSelectedForm(null);
-    };
-
-    if (loading) {
+    if (!user) {
         return (
-            <div className="flex h-[80vh] items-center justify-center flex-col gap-4">
-                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
-                <p className="text-gray-500 text-sm mt-4">Loading forms...</p>
-                <p className="text-gray-400 text-xs">If this takes more than 30 seconds, the backend may be starting up</p>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-gray-800 mb-4">Please sign in to view your dashboard</h2>
+                    <Link
+                        to="/signin"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    >
+                        Sign In
+                    </Link>
+                </div>
             </div>
         );
     }
 
-    if (error) {
+    if (loading) {
         return (
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-                <div className="bg-red-50 border-l-4 border-red-400 p-6 rounded-lg">
-                    <div className="flex items-center">
-                        <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                            </svg>
-                        </div>
-                        <div className="ml-3 flex-1">
-                            <h3 className="text-lg font-medium text-red-800">Error Loading Dashboard</h3>
-                            <p className="mt-2 text-sm text-red-700">{error}</p>
-                            <div className="mt-4">
-                                <button
-                                    onClick={fetchForms}
-                                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
-                                >
-                                    Retry
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
             </div>
         );
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <div className="flex justify-between items-center mb-10">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-                    <p className="text-gray-500 mt-1">Manage your forms and view responses.</p>
-                </div>
-                <Link
-                    to="/"
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 font-medium"
-                >
-                    <Plus size={20} /> Create New Form
-                </Link>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {/* Create New Card (optional, or just stick to button above) */}
-                {/* We stick to the standard grid for forms */}
-
-                {forms.map(form => (
-                    <div
-                        key={form._id}
-                        className="group bg-white rounded-xl border border-gray-100 p-6 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 relative overflow-hidden"
+        <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold text-gray-900">Your Forms</h1>
+                    <Link
+                        to="/create"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                     >
-                        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                        <Plus className="-ml-1 mr-2 h-5 w-5" />
+                        Create New Form
+                    </Link>
+                </div>
 
-                        <div className="flex justify-between items-start mb-4">
-                            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                <FileText size={24} />
+                {error && (
+                    <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                </svg>
                             </div>
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${form.responseCount > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                {form.responseCount} Responses
-                            </span>
+                            <div className="ml-3">
+                                <p className="text-sm text-red-700">{error}</p>
+                            </div>
                         </div>
+                    </div>
+                )}
 
-                        <h3 className="font-bold text-xl text-gray-800 mb-2 truncate" title={form.title}>
-                            {form.title}
-                        </h3>
-                        <p className="text-gray-500 text-sm mb-6 h-10 line-clamp-2">
-                            {form.description || 'No description provided.'}
-                        </p>
-
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-50">
-                            <div className="flex gap-2">
-                                <Link
-                                    to={`/edit/${form._id}`}
-                                    className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                    title="Edit Form"
-                                >
-                                    <Edit size={18} />
-                                </Link>
-                                <Link
-                                    to={`/analytics/${form._id}`}
-                                    className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
-                                    title="View Analytics"
-                                >
-                                    <BarChart3 size={18} />
-                                </Link>
-                                <button
-                                    onClick={() => openShareModal(form)}
-                                    className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                    title="Share Form"
-                                >
-                                    <Share2 size={18} />
-                                </button>
-                                <button
-                                    onClick={() => deleteForm(form._id)}
-                                    className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                    title="Delete Form"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
+                {forms.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-lg shadow">
+                        <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-lg font-medium text-gray-900">No forms yet</h3>
+                        <p className="mt-1 text-sm text-gray-500">Get started by creating a new form.</p>
+                        <div className="mt-6">
                             <Link
-                                to={`/form/${form._id}`}
-                                className="flex items-center gap-1 text-blue-600 font-medium hover:text-blue-800 transition-colors"
+                                to="/create"
+                                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                             >
-                                Preview <ExternalLink size={14} />
+                                <Plus className="-ml-1 mr-2 h-5 w-5" />
+                                New Form
                             </Link>
                         </div>
                     </div>
-                ))}
-
-                {forms.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                        <div className="bg-gray-50 p-4 rounded-full mb-4">
-                            <FileText className="h-10 w-10 text-gray-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">No forms created yet</h3>
-                        <p className="text-gray-500 max-w-md text-center mb-8">
-                            Start building your first AI-powered form to collect responses and insights.
-                        </p>
-                        <Link
-                            to="/"
-                            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium transition-colors shadow-md"
-                        >
-                            Create Your First Form
-                        </Link>
+                ) : (
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {forms.map((form) => (
+                            <div key={form._id} className="bg-white overflow-hidden shadow rounded-lg">
+                                <div className="p-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-medium text-gray-900 truncate">{form.title}</h3>
+                                        <div className="ml-2 flex-shrink-0 flex">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedForm(form);
+                                                    setShareModalOpen(true);
+                                                }}
+                                                className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            >
+                                                <Share2 className="h-5 w-5" />
+                                            </button>
+                                            <div className="ml-2 relative">
+                                                <button
+                                                    type="button"
+                                                    className="p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                                    id="options-menu"
+                                                    aria-expanded="false"
+                                                    aria-haspopup="true"
+                                                >
+                                                    <MoreHorizontal className="h-5 w-5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                                        {form.description || 'No description'}
+                                    </p>
+                                    <div className="mt-4 flex items-center justify-between">
+                                        <div className="flex items-center text-sm text-gray-500">
+                                            <BarChart3 className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
+                                            <span>{form.responseCount} responses</span>
+                                        </div>
+                                        <div className="flex space-x-2">
+                                            <Link
+                                                to={`/edit/${form._id}`}
+                                                className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            >
+                                                <Edit className="-ml-0.5 mr-2 h-4 w-4" />
+                                                Edit
+                                            </Link>
+                                            <Link
+                                                to={`/form/${form._id}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                            >
+                                                <ExternalLink className="-ml-0.5 mr-2 h-4 w-4" />
+                                                View
+                                            </Link>
+                                            <button
+                                                onClick={() => handleDelete(form._id)}
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                            >
+                                                <Trash2 className="-ml-0.5 mr-2 h-4 w-4" />
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </div>
 
-            {/* Share Modal */}
-            {selectedForm && (
-                <ShareModal
-                    isOpen={shareModalOpen}
-                    onClose={closeShareModal}
-                    formTitle={selectedForm.title}
-                    formId={selectedForm._id}
-                />
-            )}
+            <ShareModal
+                isOpen={shareModalOpen}
+                onClose={() => setShareModalOpen(false)}
+                formId={selectedForm?._id}
+                formTitle={selectedForm?.title}
+            />
         </div>
     );
 };

@@ -26,8 +26,12 @@ export const API_ENDPOINTS = {
   RESPONSE: (id) => `${API_BASE_URL}/api/v1/forms/${id}/response`,
   ANALYTICS: (id) => `${API_BASE_URL}/api/v1/forms/${id}/analytics`,
   AI_GENERATE: `${API_BASE_URL}/api/v1/ai/generate`,
-  AI_GENERATE_GROK: `${API_BASE_URL}/api/v1/ai/generate-grok`, // Testing - Grok API
+  AI_GENERATE_GEMINI: `${API_BASE_URL}/api/v1/ai/generate-gemini`, // Gemini API
   AI_GENERATE_FORM: `${API_BASE_URL}/api/v1/ai/generate-form`,
+  // Authentication endpoints
+  AUTH_SIGNUP: `${API_BASE_URL}/api/v1/auth/signup`,
+  AUTH_SIGNIN: `${API_BASE_URL}/api/v1/auth/signin`,
+  AUTH_ME: `${API_BASE_URL}/api/v1/auth/me`,
 };
 
 export default API_ENDPOINTS;

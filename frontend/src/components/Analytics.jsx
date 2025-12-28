@@ -27,10 +27,10 @@ const Analytics = () => {
                     axios.get(API_ENDPOINTS.FORM(id)),
                     axios.get(API_ENDPOINTS.ANALYTICS(id))
                 ]);
-                
+
                 const form = formRes.data;
                 const responses = responsesRes.data.responses || [];
-                
+
                 // Process response data
                 const summary = {
                     totalResponses: responses.length,
@@ -41,19 +41,19 @@ const Analytics = () => {
                         responses: responses.map(r => r.answers[field.id])
                     }))
                 };
-                
+
                 // Calculate completion rate (assuming all questions are required for now)
                 if (responses.length > 0) {
                     const completeResponses = responses.filter(r => {
                         return form.fields.every(field => {
                             const answer = r.answers[field.id];
-                            return answer !== undefined && answer !== null && answer !== '' && 
-                                  (!Array.isArray(answer) || answer.length > 0);
+                            return answer !== undefined && answer !== null && answer !== '' &&
+                                (!Array.isArray(answer) || answer.length > 0);
                         });
                     }).length;
                     summary.completionRate = Math.round((completeResponses / responses.length) * 100);
                 }
-                
+
                 setAnalytics(summary);
             } catch (err) {
                 console.error('Error fetching analytics:', err);
@@ -149,7 +149,7 @@ const Analytics = () => {
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
                     <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
@@ -188,20 +188,20 @@ const Analytics = () => {
 
     const exportToCSV = () => {
         if (!analytics) return;
-        
+
         // Create CSV content
         let csvContent = 'data:text/csv;charset=utf-8,';
-        
+
         // Add headers
         const headers = ['Question', 'Response', 'Count', 'Percentage'];
         csvContent += headers.join(',') + '\r\n';
-        
+
         // Add data rows
         analytics.questions.forEach(question => {
             if (question.responses && question.responses.length > 0) {
                 const responseCounts = {};
                 let totalResponses = 0;
-                
+
                 question.responses.forEach(response => {
                     if (response !== undefined && response !== null && response !== '') {
                         const key = Array.isArray(response) ? response.join(', ') : String(response);
@@ -209,7 +209,7 @@ const Analytics = () => {
                         totalResponses++;
                     }
                 });
-                
+
                 Object.entries(responseCounts).forEach(([value, count]) => {
                     const percentage = Math.round((count / totalResponses) * 100);
                     const row = [
@@ -222,7 +222,7 @@ const Analytics = () => {
                 });
             }
         });
-        
+
         // Create download link
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement('a');
@@ -266,8 +266,8 @@ const Analytics = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
                 <div className="flex items-center gap-4">
-                    <button 
-                        onClick={() => navigate('/dashboard')} 
+                    <button
+                        onClick={() => navigate('/')}
                         className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
                     >
                         <ArrowLeft size={20} />
@@ -277,7 +277,7 @@ const Analytics = () => {
                         <p className="text-gray-500 text-sm">Form ID: {id}</p>
                     </div>
                 </div>
-                <button 
+                <button
                     onClick={exportToCSV}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors text-sm font-medium self-start md:self-center"
                 >
@@ -333,7 +333,7 @@ const Analytics = () => {
             {/* Questions List */}
             <div className="space-y-6">
                 <h2 className="text-xl font-semibold text-gray-900">Question Analytics</h2>
-                
+
                 {analytics?.questions?.length > 0 ? (
                     <div className="space-y-4">
                         {analytics.questions.map((question, index) => (
@@ -359,7 +359,7 @@ const Analytics = () => {
                                         )}
                                     </div>
                                 </button>
-                                
+
                                 {expandedQuestion === index && (
                                     <div className="px-6 pb-6 pt-2 border-t border-gray-200">
                                         {renderQuestionAnalytics(question)}

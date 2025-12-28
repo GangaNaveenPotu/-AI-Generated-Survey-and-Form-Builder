@@ -1,6 +1,14 @@
 @import 'tailwindcss';
 
+/* Silicon Valley Theme - Light Version - 60-30-10 Rule */
+/* 60% Neutral: Ghost White (#F8FAFC) - Main backgrounds */
+/* 30% Secondary: Light Gray (#F1F5F9) - Headers, cards, navigation */
+/* 10% Primary/Accent: Electric Indigo (#6366F1) & Cyan (#22D3EE) - Buttons, links, CTAs */
+
 body {
-  background-color: #f3f4f6;
-  font-family: 'Inter', sans-serif;
+  background: #F8FAFC; /* 60% - Neutral Ghost White */
+  min-height: 100vh;
+  font-family: 'Roboto', 'Arial', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
