@@ -491,13 +491,11 @@ VITE_API_URL=http://localhost:5000
 
 ---
 
-## 📄 License
 
-This project is licensed under the MIT License.
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - [Anthropic](https://www.anthropic.com/) for the Claude API
 - [Google](https://ai.google.dev/) for the Gemini API
@@ -509,10 +507,10 @@ This project is licensed under the MIT License.
 
 ---
 
-## 📞 Support
+##  Support
 
 For issues, questions, or contributions, please open an issue on the [GitHub repository](https://github.com/GangaNaveenPotu/-AI-Generated-Survey-and-Form-Builder).
-
+ganganaveenpotu@gmail.com 
 ---
 
-**Made with ❤️ using the MERN stack**
+**Made with using the MERN stack**
