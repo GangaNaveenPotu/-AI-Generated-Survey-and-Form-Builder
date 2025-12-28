@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
-import { BarChart3, FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2, Share2 } from 'lucide-react';
+import { FileText, ExternalLink, Plus, Clock, MoreHorizontal, Edit, Trash2, Share2, BarChart } from 'lucide-react';
 import API_ENDPOINTS from '../config/api';
 import ShareModal from './ShareModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -187,12 +187,15 @@ const Dashboard = () => {
                                     <p className="mt-1 text-sm text-gray-500 line-clamp-2">
                                         {form.description || 'No description'}
                                     </p>
-                                    <div className="mt-4 flex items-center justify-between">
-                                        <div className="flex items-center text-sm text-gray-500">
-                                            <BarChart3 className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" />
-                                            <span>{form.responseCount} responses</span>
-                                        </div>
-                                        <div className="flex space-x-2">
+                                    <div className="mt-4 flex items-center">
+                                        <div className="flex space-x-2 flex-wrap gap-2 w-full">
+                                            <Link
+                                                to={`/analytics/${form._id}`}
+                                                className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                                            >
+                                                <BarChart className="-ml-0.5 mr-2 h-4 w-4" />
+                                                Analytics ({form.responseCount} {form.responseCount === 1 ? 'response' : 'responses'})
+                                            </Link>
                                             <Link
                                                 to={`/edit/${form._id}`}
                                                 className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"

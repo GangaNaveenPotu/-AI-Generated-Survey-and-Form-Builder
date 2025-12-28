@@ -23,9 +23,21 @@ const Analytics = () => {
         const fetchAnalytics = async () => {
             try {
                 setLoading(true);
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    setError('Authentication required. Please sign in again.');
+                    navigate('/signin');
+                    return;
+                }
+
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+
                 const [formRes, responsesRes] = await Promise.all([
                     axios.get(API_ENDPOINTS.FORM(id)),
-                    axios.get(API_ENDPOINTS.ANALYTICS(id))
+                    axios.get(API_ENDPOINTS.ANALYTICS(id), { headers })
                 ]);
 
                 const form = formRes.data;
@@ -57,14 +69,20 @@ const Analytics = () => {
                 setAnalytics(summary);
             } catch (err) {
                 console.error('Error fetching analytics:', err);
-                setError('Failed to load analytics data');
+                if (err.response?.status === 401) {
+                    localStorage.removeItem('token');
+                    setError('Your session has expired. Please sign in again.');
+                    setTimeout(() => navigate('/signin'), 2000);
+                } else {
+                    setError('Failed to load analytics data. Please try again.');
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchAnalytics();
-    }, [id]);
+    }, [id, navigate]);
 
     const renderQuestionAnalytics = (question) => {
         if (!question.responses || question.responses.length === 0) {
